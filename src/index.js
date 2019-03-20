@@ -1,22 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { applyMiddleware, createStore, compose } from 'redux';
-import { Provider } from 'react-redux';
-import logger from 'redux-logger';
 import './main.scss';
-import AppContainer from './containers/AppContainer';
-import rootReducer from './reducers';
+import App from './components/App';
+import MobileNet from './utils/mobilenet';
 
-const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
-
-const store = createStore(
-  rootReducer,
-  composeEnhancers(applyMiddleware(logger))
-);
+const emojiMobileNet = new MobileNet();
 
 ReactDOM.render(
-  <Provider store={store}>
-    <AppContainer />
-  </Provider>,
+  <App emojiMobileNet={emojiMobileNet} />,
   document.getElementById('root')
 );

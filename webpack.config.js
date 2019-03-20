@@ -74,11 +74,14 @@ module.exports = {
     ]
   },
   devServer: {
-    port: 3000,
+    port: 8080,
+    public: 'http://localhost:8080',
     open: true,
     proxy: {
       '/api': 'http://localhost:8081'
     },
+    host: '0.0.0.0',
+    https: true,
     historyApiFallback: {
       disableDotRule: true
     }
