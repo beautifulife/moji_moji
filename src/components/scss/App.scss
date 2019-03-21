@@ -5,12 +5,16 @@ html {
 *,
 *::before,
 *::after {
-  box-sizing: inherit; 
+  box-sizing: inherit;
 }
 
 body {
-  margin: 0;
-  padding: 0;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   font-family: 'Lato', Arial, Helvetica, sans-serif;
   font-weight: normal;
   color: rgba(0, 0, 0, 0.7);
@@ -23,22 +27,46 @@ button {
   all: unset;
 }
 
-p {
-  margin: 0;
-  padding: 0;
-}
-
 a,
 button {
   cursor: pointer;
 }
 
 .App {
-  min-width: 100vw;
-  min-height: 100vh;
-  border: 1px solid #eee;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: black;
 
-  &__current-imoji {
-    z-index: 1000
+  &__current-emoji {
+    z-index: 1000;
+    color: white;
+    background-color: black;
+  }
+}
+
+@media (max-width: 700px) {
+  html {
+    font-size: 80%;
+  }
+}
+
+@media (max-width: 600px) {
+  html {
+    font-size: 70%;
+  }
+}
+
+@media (max-width: 400px) {
+  html {
+    font-size: 60%;
+  }
+}
+
+@media (max-width: 350px) {
+  html {
+    font-size: 50%;
   }
 }

@@ -3,16 +3,20 @@ import {
   BrowserRouter as Router,
   Route,
   Redirect,
-  Switch,
-  Link
+  Switch
 } from 'react-router-dom';
 import * as tfc from '@tensorflow/tfjs-core';
 import { shuffle } from 'lodash';
 import io from 'socket.io-client';
 import Camera from './Camera';
+import Intro from './Intro';
+import Loader from './Loader';
+
 import {
   GAME_MAX_ITEMS,
+  GAME_START_TIME,
   GAME_TIMER_DELAY,
+  GAME_EXTEND_TIME,
   VIDEO_PIXELS
 } from '../utils/constants';
 import {
@@ -30,17 +34,21 @@ export default class App extends Component {
     super(props);
     this.state = {
       endpoint: '192.168.0.35:3000',
-      color: 'red',
+      color: 'transparent',
       currentEmoji: {},
-      emojisFound: [],
       endGamePhotos: [],
-      isFirstRun: true,
-      isRunning: false,
+      emojisFound: [],
       score: 0,
-      gameDifficulty: '1121222345',
-      currentLvlIndex: 0,
-      gameIsPaused: false
+      isLoading: false,
+      timer: GAME_START_TIME
     };
+
+    this.topKemojiName = '';
+    this.isFirstRun = true;
+    this.isRunning = false;
+    this.gameDifficulty = '1121222345';
+    this.currentLvlIndex = 0;
+    this.gameIsPaused = false;
 
     this.emojiDemo = EMOJIS_DEMO;
     this.emojiLvl1 = shuffle(EMOJIS_LVL_1);
@@ -62,21 +70,18 @@ export default class App extends Component {
     this.onInitGame = this.onInitGame.bind(this);
     this.handleStartClick = this.handleStartClick.bind(this);
     this.send = this.send.bind(this);
+    this.startGame = this.startGame.bind(this);
   }
 
   componentDidMount() {
     const { endpoint } = this.state;
-    const socket = io(endpoint, {secure: true});
+    const socket = io(endpoint, { secure: true });
 
     setInterval(this.send(), 1000);
     socket.on('color', col => {
       document.body.style.backgroundColor = col;
       console.log('got message', col);
     });
-
-    fetch('https://192.168.0.35:3000', {
-      mode: 'cors'
-    }).then(res => console.log(res));
   }
 
   send() {
@@ -88,6 +93,10 @@ export default class App extends Component {
 
   checkEmojiMatch(emojiNameTop1, emojiNameTop2) {
     const { currentEmoji } = this.state;
+
+    if (this.topKemojiName !== emojiNameTop1) {
+      this.topKemojiName = emojiNameTop1;
+    }
 
     if (
       currentEmoji.name === emojiNameTop1 ||
@@ -101,39 +110,65 @@ export default class App extends Component {
     const { currentEmoji, emojisFound, endGamePhotos, score } = this.state;
 
     this.pauseGame();
+
+    const photo = this.saveAnswer();
+
     this.setState({
       score: score + 1,
-      emojisFound: emojisFound.push(currentEmoji)
+      emojisFound: [...emojisFound, currentEmoji],
+      endGamePhotos: [...endGamePhotos, photo]
     });
-    // endGamePhotos.push(camera.snapshot());
 
     // ui.cameraFlash();
 
-    // const timeToFind = this.timerAtStartOfRound - this.timer;
+    if (GAME_MAX_ITEMS === score) {
+      this.showAllItemsFoundView(this.endGamePhotos);
+    } else {
+      setTimeout(() => {
+        this.showItemFoundView();
+      }, 1000);
+    }
+  }
 
-    // window.gtag('event', 'Success', {
-    //   event_category: 'Emoji',
-    //   event_label: `${this.currentEmoji.emoji} - ${this.currentEmoji.name}`,
-    //   value: timeToFind
+  showItemFoundView() {
+    // this.showView(VIEWS.FOUND_ITEM);
+    this.extendTimer();
+  }
+
+  updateTimer(value) {
+    this.setState({
+      timer: value
+    });
+  }
+
+  delayedUpdateTimer(value) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        this.updateTimer(value);
+        resolve(value);
+      }, 70);
+    });
+  }
+
+  async extendTimer() {
+    const { timer } = this.state;
+    const maxTimer = timer + 1 + GAME_EXTEND_TIME + 1;
+
+    for (let i = timer + 2; i < maxTimer; i++) {
+      await this.delayedUpdateTimer(i);
+    }
+
+    // this.setState({
+    //   timer: maxTimer - 1
     // });
-
-    // if (GAME_MAX_ITEMS === this.score) {
-    //   ui.showAllItemsFoundView(this.endGamePhotos);
-    // } else {
-    //   setTimeout(() => {
-    //     ui.showItemFoundView();
-    //   }, 1000);
-    // }
   }
 
   nextEmoji() {
-    const { currentLvlIndex, gameDifficulty } = this.state;
-
-    if (currentLvlIndex === gameDifficulty.length) {
-      this.setState({ currentLvlIndex: 0 });
+    if (this.currentLvlIndex === this.gameDifficulty.length) {
+      this.currentLvlIndex = 0;
     }
 
-    const curLvl = gameDifficulty[currentLvlIndex];
+    const curLvl = this.gameDifficulty[this.currentLvlIndex];
     let lvlArray = this.emojiLvlLookup[curLvl];
     // let nextEmoji = lvlArray.shift();
     let nextEmoji = this.emojiDemo.shift();
@@ -147,38 +182,35 @@ export default class App extends Component {
       nextEmoji = lvlArray.shift();
     }
 
+    this.currentLvlIndex++;
+
     this.setState({
-      currentLvlIndex: currentLvlIndex + 1,
       currentEmoji: nextEmoji
     });
 
     // ui.setActiveEmoji(this.currentEmoji.path);
-
-    // window.gtag('event', 'Find', {
-    //   event_category: 'Emoji',
-    //   event_label: `${this.currentEmoji.emoji} - ${this.currentEmoji.name}`
-    // });
   }
 
   pauseGame(pauseCamera) {
-    alert('got it');
-    this.setState({
-      gameIsPaused: true,
-      isRunning: false
-    });
+    if (this.isRunning) {
+      pauseCamera();
+    }
 
-    pauseCamera();
+    this.gameIsPaused = true;
+    this.isRunning = false;
+
+    // this.startGame();
+    this.nextEmoji();
+
     window.clearInterval(this.timerInterval);
     window.clearInterval(this.speakInterval);
   }
 
   async predict(videoRef) {
-    const { isRunning } = this.state;
     const { emojiMobileNet } = this.props;
 
-    if (isRunning) {
+    if (this.isRunning) {
       const result = tfc.tidy(() => {
-        console.log('videoElement:', videoRef.current);
         const pixels = tfc.fromPixels(videoRef.current);
         const centerHeight = pixels.shape[0] / 2;
         const beginHeight = centerHeight - VIDEO_PIXELS / 2;
@@ -196,8 +228,6 @@ export default class App extends Component {
 
       // Match the top 2 matches against our current active emoji.
       this.checkEmojiMatch(topK[0].label, topK[1].label);
-
-      console.log(...topK);
     }
 
     window.requestAnimationFrame(() => this.predict(videoRef));
@@ -241,23 +271,23 @@ export default class App extends Component {
     emojiMobileNet.predict(tfc.zeros([VIDEO_PIXELS, VIDEO_PIXELS, 3]));
   }
 
-  async onInitGame(videoRef, pauseCamera, unPauseCamera) {
-    const { isFirstRun } = this.state;
+  async onInitGame(videoRef, pauseCamera, unPauseCamera, snapshot) {
     const { emojiMobileNet } = this.props;
 
-    if (isFirstRun) {
+    if (this.isFirstRun) {
       try {
         await emojiMobileNet.load();
         await this.warmUpModel();
 
-        this.setState({
-          isFirstRun: false
-        });
+        this.isFirstRun = false;
+        this.isRunning = true;
 
         this.nextEmoji();
         this.predict(videoRef);
         this.pauseGame = this.pauseGame.bind(this, pauseCamera);
         this.startGame = this.startGame.bind(this, unPauseCamera);
+        this.saveAnswer = this.saveAnswer.bind(this, snapshot);
+
         // this.showCountdown();
       } catch (error) {
         console.log(error);
@@ -268,33 +298,39 @@ export default class App extends Component {
     }
   }
 
-  startGame(unPauseCamera) {
-    unPauseCamera();
-    this.setState({
-      isRunning: true
-    });
+  saveAnswer(snapshot) {
+    return snapshot();
+  }
 
-    this.timerAtStartOfRound = this.timer;
+  startGame(unPauseCamera) {
+    const { timer } = this.state;
+
+    if (!this.isRunning && !this.isFirstRun) {
+      unPauseCamera();
+    }
+
+    this.isRunning = true;
+
+    this.timerAtStartOfRound = timer;
     this.timerInterval = window.setInterval(() => {
       this.handleGameTimerCountdown();
     }, GAME_TIMER_DELAY);
   }
 
   handleGameTimerCountdown() {
-    if (this.timer === 0) {
+    const { timer, endGamePhotos } = this.state;
+
+    if (timer === 0) {
+      console.log(this.timerInterval);
       window.clearInterval(this.timerInterval);
 
-      // window.gtag('event', 'Failure', {
-      //   event_category: 'Emoji',
-      //   event_label: `${this.currentEmoji.emoji} - ${this.currentEmoji.name}`
-      // });
-
-      // if (this.score === 0) {
-      //   ui.showNoItemsFoundView();
-      // } else {
-      //   ui.showXItemsFoundView(this.endGamePhotos);
-      // }
-    } else if (this.timer <= 5) {
+      if (this.score === 0) {
+        // ui.showNoItemsFoundView();
+      } else {
+        // ui.showXItemsFoundView(this.endGamePhotos);
+        console.log(endGamePhotos[0].currentSrc);
+      }
+    } else if (timer <= 5) {
       // if (this.timer === 5) {
       //   this.playAudio(AUDIO.TIME_RUNNING_LOW);
       // }
@@ -303,7 +339,9 @@ export default class App extends Component {
       // ui.updateTimer(this.timer);
     }
 
-    this.timer--;
+    this.setState({
+      timer: timer - 1
+    });
   }
 
   handleStartClick(ev) {
@@ -311,23 +349,29 @@ export default class App extends Component {
   }
 
   render() {
-    const { currentEmoji, emojisFound, endpoint } = this.state;
-
+    const { currentEmoji, score, timer, isLoading } = this.state;
 
     return (
       <Router>
         <div className="App">
           {Object.keys(currentEmoji).length ? (
             <div className="App__current-emoji">
-              <span>{currentEmoji.name}</span>
-              <span>{currentEmoji.emoji}</span>
-              <span>{emojisFound.length}</span>
+              <span>current name: {currentEmoji.name}</span>&nbsp;
+              <span>current: {currentEmoji.emoji}</span>
+              <br />
+              <span>expect count: {score}</span>
+              <br />
+              <span>left: {timer}</span>
             </div>
           ) : null}
-          <Link to="/camera" onClick={this.handleStartClick}>
-            go to camera
-          </Link>
-          <button type="button" onClick={this.send}>socket test</button>
+          {isLoading && <Loader />}
+          <Route
+            exact
+            path="/"
+            render={props => (
+              <Intro {...props} onPlayClick={this.handleStartClick} />
+            )}
+          />
           <Route
             path="/camera"
             render={props => (
