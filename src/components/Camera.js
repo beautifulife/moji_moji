@@ -1,6 +1,7 @@
-import React, { Component } from 'react';
+import React, { Component, Fragment } from 'react';
 import { isMobile } from '../utils/device';
 import { VIDEO_PIXELS } from '../utils/constants';
+import './Camera.scss';
 
 export default class Camera extends Component {
   constructor(props) {
@@ -9,15 +10,53 @@ export default class Camera extends Component {
       isCameraFront: false,
       isCameraPaused: false
     };
+    this.snapShotCanvas = document.createElement('canvas');
     this.videoRef = React.createRef();
+
     this.handleOnLoadedMetadata = this.handleOnLoadedMetadata.bind(this);
     this.pauseCamera = this.pauseCamera.bind(this);
+    this.snapshot = this.snapshot.bind(this);
     this.unPauseCamera = this.unPauseCamera.bind(this);
   }
 
   componentDidMount() {
     this.setupCamera();
-    this.setCameraFacing();
+    // this.setCameraFacing();
+  }
+
+  componentDidUpdate() {
+    const { isCameraPaused } = this.state;
+    const { isGamePaused, doSnapShotNow } = this.props;
+
+    if (isCameraPaused !== isGamePaused) {
+      if (isGamePaused) {
+        this.pauseCamera();
+      } else {
+        this.unPauseCamera();
+      }
+    }
+
+    if (doSnapShotNow) {
+      this.snapshot();
+    }
+  }
+
+  handleOnLoadedMetadata() {
+    const { onLoadedMetadata } = this.props;
+
+    this.setupVideoDimensions(
+      this.videoRef.current.videoWidth,
+      this.videoRef.current.videoHeight
+    );
+
+    onLoadedMetadata(this.videoRef);
+  }
+
+  pauseCamera() {
+    this.videoRef.current.pause();
+    this.setState({
+      isCameraPaused: true
+    });
   }
 
   async setupCamera() {
@@ -32,20 +71,12 @@ export default class Camera extends Component {
     }
   }
 
-  handleOnLoadedMetadata() {
-    const { onLoadedMetadata } = this.props;
-
-    console.log(
-      this.videoRef.current.videoWidth,
-      this.videoRef.current.videoHeight
-    );
-
-    this.setupVideoDimensions(
-      this.videoRef.current.videoWidth,
-      this.videoRef.current.videoHeight
-    );
-
-    onLoadedMetadata(this.videoRef, this.pauseCamera, this.unPauseCamera);
+  setCameraFacing() {
+    if (!isMobile()) {
+      this.setState({
+        isCameraFront: true
+      });
+    }
   }
 
   setupVideoDimensions(width, height) {
@@ -60,46 +91,9 @@ export default class Camera extends Component {
     }
   }
 
-  pauseCamera() {
-    const { isCameraPaused } = this.state;
-
-    if (!isCameraPaused) {
-      this.videoRef.current.pause();
-      this.setState({
-        isCameraPaused: true
-      });
-    }
-  }
-
-  unPauseCamera() {
-    const { isCameraPaused } = this.state;
-
-    if (isCameraPaused) {
-      this.videoRef.current.play();
-      this.setState({
-        isCameraPaused: false
-      });
-    }
-  }
-
-  /**
-   * Adjusts the camera CSS to flip the display since we are viewing the
-   * camera on a desktop where we want the camera to be mirrored.
-   */
-  setCameraFacing() {
-    if (!isMobile()) {
-      this.setState({
-        isCameraFront: true
-      });
-    }
-  }
-
-  /**
-   * Takes a snapshot of the camera feed and converts it
-   * to an image via a canvas element.
-   * @returns <HTMLImageElement> The snapshot as an image node.
-   */
   snapshot() {
+    const { onSnapShot } = this.props;
+
     this.snapShotCanvas.height = this.videoRef.current.height;
     this.snapShotCanvas.width = this.videoRef.current.width;
 
@@ -118,16 +112,27 @@ export default class Camera extends Component {
     img.src = this.snapShotCanvas
       .toDataURL('image/png')
       .replace('image/png', 'image/octet-stream');
-    return img;
+
+    onSnapShot(img);
+  }
+
+  unPauseCamera() {
+    this.videoRef.current.play();
+    this.setState({
+      isCameraPaused: false
+    });
   }
 
   render() {
-    const { isCameraFront } = this.state;
-    console.log('isCameraFront:', isCameraFront);
+    const { isCameraFront, isCameraPaused } = this.state;
 
     return (
-      <div className="Camera">
-        <div className="Camera__capture-flash" />
+      <div className={isCameraPaused ? 'Camera capture' : 'Camera'}>
+        {isCameraPaused && (
+          <Fragment>
+            <div className="Camera__capture-flash" />
+          </Fragment>
+        )}
         <video
           ref={this.videoRef}
           className={

@@ -22,9 +22,9 @@ export const EMOJIS_DEMO = [
     path: '/img/emojis/game/hand.svg'
   },
   {
-    name: 'hand',
-    emoji: '✋',
-    path: '/img/emojis/game/hand.svg'
+    name: 'light bulb',
+    emoji: '💡',
+    path: '/img/emojis/game/light bulb.svg'
   },
   {
     name: 'hand',
@@ -32,9 +32,9 @@ export const EMOJIS_DEMO = [
     path: '/img/emojis/game/hand.svg'
   },
   {
-    name: 'hand',
-    emoji: '✋',
-    path: '/img/emojis/game/hand.svg'
+    name: 'keyboard',
+    emoji: '⌨️',
+    path: '/img/emojis/game/keyboard.svg'
   },
   {
     name: 'hand',
@@ -42,9 +42,9 @@ export const EMOJIS_DEMO = [
     path: '/img/emojis/game/hand.svg'
   },
   {
-    name: 'hand',
-    emoji: '✋',
-    path: '/img/emojis/game/hand.svg'
+    name: 'laptop',
+    emoji: '💻',
+    path: '/img/emojis/game/laptop.svg'
   },
   {
     name: 'hand',

@@ -1,17 +1,22 @@
 import React, { Component, Fragment } from 'react';
-import {
-  BrowserRouter as Router,
-  Route,
-  Redirect,
-  Switch,
-  Link
-} from 'react-router-dom';
 import * as tfc from '@tensorflow/tfjs-core';
 import { shuffle } from 'lodash';
+import io from 'socket.io-client';
+import './App.scss';
+
 import Camera from './Camera';
+import Countdown from './Countdown';
+import Finish from './Finish';
+import Intro from './Intro';
+import Loader from './Loader';
+import PopUpMenu from './PopUpMenu';
+import StatusBar from './StatusBar';
+
 import {
   GAME_MAX_ITEMS,
+  GAME_START_TIME,
   GAME_TIMER_DELAY,
+  GAME_EXTEND_TIME,
   VIDEO_PIXELS
 } from '../utils/constants';
 import {
@@ -24,20 +29,31 @@ import {
   EMOJIS_LVL_DEMO
 } from '../utils/game_levels';
 
-export default class App extends Component {
+class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      color: 'transparent',
+      countdown: 3,
       currentEmoji: {},
+      currentPage: 'intro',
+      didUserFound: false,
+      doSnapShotNow: false,
       emojisFound: [],
+      endpoint: 'localhost:3000',
       endGamePhotos: [],
-      isFirstRun: true,
-      isRunning: false,
+      isCountdown: false,
+      isGamePaused: false,
+      isLoading: false,
       score: 0,
-      gameDifficulty: '1121222345',
-      currentLvlIndex: 0,
-      gameIsPaused: false
+      timer: GAME_START_TIME
     };
+
+    this.currentLvlIndex = 0;
+    this.gameDifficulty = '1121222345';
+    this.isFirstRun = true;
+    this.isRunning = false;
+    this.topKemojiName = '';
 
     this.emojiDemo = EMOJIS_DEMO;
     this.emojiLvl1 = shuffle(EMOJIS_LVL_1);
@@ -56,12 +72,34 @@ export default class App extends Component {
       '#': this.emojiLvlDemo
     };
 
+    this.handleNextClick = this.handleNextClick.bind(this);
+    this.handlePlayClick = this.handlePlayClick.bind(this);
+    this.handleSnapShot = this.handleSnapShot.bind(this);
+    this.moveToIntro = this.moveToIntro.bind(this);
     this.onInitGame = this.onInitGame.bind(this);
-    this.handleStartClick = this.handleStartClick.bind(this);
+    this.playGameAgain = this.playGameAgain.bind(this);
+    this.send = this.send.bind(this);
+    this.startGame = this.startGame.bind(this);
+    this.startLoading = this.startLoading.bind(this);
+    this.termintateLoading = this.termintateLoading.bind(this);
+  }
+
+  componentDidMount() {
+    const { endpoint } = this.state;
+    // const socket = io(endpoint, { secure: true });
+
+    // socket.on('color', col => {
+    //   document.body.style.backgroundColor = col;
+    //   console.log('got message', col);
+    // });
   }
 
   checkEmojiMatch(emojiNameTop1, emojiNameTop2) {
     const { currentEmoji } = this.state;
+
+    if (this.topKemojiName !== emojiNameTop1) {
+      this.topKemojiName = emojiNameTop1;
+    }
 
     if (
       currentEmoji.name === emojiNameTop1 ||
@@ -71,88 +109,196 @@ export default class App extends Component {
     }
   }
 
+  countdown(count) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        if (count === 0) {
+          if (!this.isRunning) {
+            this.startGame();
+          }
+
+          this.setState({
+            isCountdown: false
+          });
+        } else {
+          this.setState({
+            isLoading: false,
+            isCountdown: true,
+            countdown: count
+          });
+        }
+        resolve(count);
+      }, 1000);
+    });
+  }
+
   emojiFound() {
-    const { currentEmoji, emojisFound, endGamePhotos, score } = this.state;
+    const { currentEmoji, emojisFound, score } = this.state;
 
     this.pauseGame();
     this.setState({
       score: score + 1,
-      emojisFound: emojisFound.push(currentEmoji)
+      emojisFound: [...emojisFound, currentEmoji],
+      doSnapShotNow: true
     });
-    // endGamePhotos.push(camera.snapshot());
 
-    // ui.cameraFlash();
+    if (GAME_MAX_ITEMS === score) {
+      this.setState({
+        currentPage: 'finish'
+      });
+    } else {
+      setTimeout(() => {
+        this.showItemFoundView();
+      }, 500);
+    }
+  }
 
-    // const timeToFind = this.timerAtStartOfRound - this.timer;
+  showItemFoundView() {
+    this.extendTimer();
+    this.setState({
+      didUserFound: true
+    });
+  }
 
-    // window.gtag('event', 'Success', {
-    //   event_category: 'Emoji',
-    //   event_label: `${this.currentEmoji.emoji} - ${this.currentEmoji.name}`,
-    //   value: timeToFind
-    // });
+  updateTimer(value) {
+    this.setState({
+      timer: value
+    });
+  }
 
-    // if (GAME_MAX_ITEMS === this.score) {
-    //   ui.showAllItemsFoundView(this.endGamePhotos);
-    // } else {
-    //   setTimeout(() => {
-    //     ui.showItemFoundView();
-    //   }, 1000);
-    // }
+  delayedUpdateTimer(value) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        this.updateTimer(value);
+        resolve(value);
+      }, 70);
+    });
+  }
+
+  async extendTimer() {
+    const { timer } = this.state;
+    const maxTimer = timer + 1 + GAME_EXTEND_TIME + 1;
+
+    for (let i = timer + 2; i < maxTimer; i++) {
+      await this.delayedUpdateTimer(i);
+    }
+  }
+
+  handleGameTimerCountdown() {
+    const { timer } = this.state;
+
+    if (timer === 0) {
+      window.clearInterval(this.timerInterval);
+      this.showFoundView();
+    } else {
+      this.setState({
+        timer: timer - 1
+      });
+    }
+  }
+
+  handlePlayClick() {
+    this.setState({
+      isLoading: true,
+      currentPage: 'game'
+    });
+  }
+
+  handleNextClick() {
+    this.showCountdown();
+    this.nextEmoji();
+  }
+
+  handleSnapShot(img) {
+    const { endGamePhotos } = this.state;
+
+    this.setState({
+      doSnapShotNow: false,
+      endGamePhotos: [...endGamePhotos, img]
+    });
+  }
+
+  moveToIntro() {
+    this.resetGame();
+    this.setState({
+      currentPage: 'intro'
+    });
   }
 
   nextEmoji() {
-    const { currentLvlIndex, gameDifficulty } = this.state;
-
-    if (currentLvlIndex === gameDifficulty.length) {
-      this.setState({ currentLvlIndex: 0 });
+    if (this.currentLvlIndex === this.gameDifficulty.length) {
+      this.currentLvlIndex = 0;
     }
 
-    const curLvl = gameDifficulty[currentLvlIndex];
+    const curLvl = this.gameDifficulty[this.currentLvlIndex];
     let lvlArray = this.emojiLvlLookup[curLvl];
-    // let nextEmoji = lvlArray.shift();
-    let nextEmoji = this.emojiDemo.shift();
+    let nextEmoji = lvlArray.shift();
+    // for demo
+    // let nextEmoji = this.emojiDemo.shift();
 
-    // If we have selected all possible emojis from a particular level,
-    // reshuffle the list of possible emoji for that level and request a new
-    // next emoji.
     if (nextEmoji === undefined) {
       this.reShuffleLevelEmojis(curLvl);
       lvlArray = this.emojiLvlLookup[curLvl];
       nextEmoji = lvlArray.shift();
     }
 
+    this.currentLvlIndex++;
+
     this.setState({
-      currentLvlIndex: currentLvlIndex + 1,
       currentEmoji: nextEmoji
     });
-
-    // ui.setActiveEmoji(this.currentEmoji.path);
-
-    // window.gtag('event', 'Find', {
-    //   event_category: 'Emoji',
-    //   event_label: `${this.currentEmoji.emoji} - ${this.currentEmoji.name}`
-    // });
   }
 
-  pauseGame(pauseCamera) {
-    alert('got it');
+  async onInitGame(videoRef) {
+    const { emojiMobileNet } = this.props;
+
+    try {
+      await emojiMobileNet.load();
+      await this.warmUpModel();
+
+      this.isFirstRun = false;
+
+      this.nextEmoji();
+      this.predict(videoRef);
+      this.showCountdown();
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  pauseCamera() {
     this.setState({
-      gameIsPaused: true,
-      isRunning: false
+      isGamePaused: true
+    });
+  }
+
+  pauseGame() {
+    if (this.isRunning) {
+      this.pauseCamera();
+    }
+
+    this.setState({
+      isGamePaused: true
     });
 
-    pauseCamera();
+    this.isRunning = false;
+
     window.clearInterval(this.timerInterval);
     window.clearInterval(this.speakInterval);
   }
 
+  playGameAgain() {
+    this.resetGame();
+    this.setState({
+      currentPage: 'game'
+    });
+  }
+
   async predict(videoRef) {
-    const { isRunning } = this.state;
     const { emojiMobileNet } = this.props;
 
-    if (isRunning) {
+    if (this.isRunning) {
       const result = tfc.tidy(() => {
-        console.log('videoElement:', videoRef.current);
         const pixels = tfc.fromPixels(videoRef.current);
         const centerHeight = pixels.shape[0] / 2;
         const beginHeight = centerHeight - VIDEO_PIXELS / 2;
@@ -169,44 +315,135 @@ export default class App extends Component {
       const topK = await emojiMobileNet.getTopKClasses(result, 10);
 
       // Match the top 2 matches against our current active emoji.
-      this.checkEmojiMatch(topK[0].label, topK[1].label);
-
       console.log(...topK);
+      this.checkEmojiMatch(topK[0].label, topK[1].label);
     }
 
     window.requestAnimationFrame(() => this.predict(videoRef));
   }
 
+  resumeGame() {
+    const { isGamePaused } = this.state;
+
+    if (isGamePaused) {
+      this.startGame();
+    }
+  }
+
+  resetGame() {
+    this.nextEmoji();
+    this.updateTimer(GAME_START_TIME);
+
+    this.setState({
+      score: 0,
+      timer: GAME_START_TIME,
+      emojisFound: [],
+      endGamePhotos: []
+    });
+
+    this.currentLvlIndex = 0;
+    this.timerAtStartOfRound = GAME_START_TIME;
+    this.topKemojiName = '';
+  }
+
   reShuffleLevelEmojis(level) {
     switch (level) {
-    case '1':
-      this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_1);
-      break;
-    case '2':
-      this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_2);
-      break;
-    case '3':
-      this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_3);
-      break;
-    case '4':
-      this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_4);
-      break;
-    case '5':
-      this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_5);
-      break;
-    case '#':
-      // NOTE: the Demo list is not shuffled since we always request them in
-      // same order for demo purposes.
-      this.emojiLvlLookup[level] = Array.from(EMOJIS_LVL_DEMO);
-      break;
-    default:
-      throw new Error(
-        'Error: expected ' +
-            level +
-            ' level string in the ' +
-            'level EmojiLevelsLookup'
-      );
+      case '1':
+        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_1);
+        break;
+      case '2':
+        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_2);
+        break;
+      case '3':
+        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_3);
+        break;
+      case '4':
+        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_4);
+        break;
+      case '5':
+        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_5);
+        break;
+      case '#':
+        // NOTE: the Demo list is not shuffled since we always request them in
+        // same order for demo purposes.
+        this.emojiLvlLookup[level] = Array.from(EMOJIS_LVL_DEMO);
+        break;
+      default:
+        throw new Error(
+          `Error: expected ${level} level string in the level EmojiLevelsLookup`
+        );
     }
+  }
+
+  async showCountdown() {
+    const { timer } = this.state;
+
+    if (this.isRunning) {
+      this.isRunning = false;
+    }
+
+    this.updateTimer(timer, true);
+
+    await this.countdown(3);
+    await this.countdown(2);
+    await this.countdown(1);
+    await this.countdown(0);
+  }
+
+  startGame() {
+    const { timer, didUserFound } = this.state;
+
+    if (didUserFound) {
+      this.setState({
+        didUserFound: false
+      });
+    }
+
+    if (!this.isRunning) {
+      this.unPauseCamera();
+    }
+
+    this.isRunning = true;
+    this.timerAtStartOfRound = timer;
+    this.timerInterval = window.setInterval(() => {
+      this.handleGameTimerCountdown();
+    }, GAME_TIMER_DELAY);
+  }
+
+  send() {
+    const { endpoint, color } = this.state;
+
+    const socket = io(endpoint);
+    socket.emit('color', color);
+  }
+
+  showFoundView() {
+    this.pauseGame();
+
+    this.setState(
+      {
+        currentPage: 'finish'
+      },
+      this.updateTimer.bind(this, GAME_START_TIME)
+    );
+  }
+
+  startLoading() {
+    this.setState({
+      isLoading: true
+    });
+  }
+
+  termintateLoading() {
+    this.setState({
+      isLoading: false
+    });
+  }
+
+  unPauseCamera() {
+    this.setState({
+      isGamePaused: false
+    });
   }
 
   warmUpModel() {
@@ -215,99 +452,63 @@ export default class App extends Component {
     emojiMobileNet.predict(tfc.zeros([VIDEO_PIXELS, VIDEO_PIXELS, 3]));
   }
 
-  async onInitGame(videoRef, pauseCamera, unPauseCamera) {
-    const { isFirstRun } = this.state;
-    const { emojiMobileNet } = this.props;
-
-    if (isFirstRun) {
-      try {
-        await emojiMobileNet.load();
-        await this.warmUpModel();
-
-        this.setState({
-          isFirstRun: false
-        });
-
-        this.nextEmoji();
-        this.predict(videoRef);
-        this.pauseGame = this.pauseGame.bind(this, pauseCamera);
-        this.startGame = this.startGame.bind(this, unPauseCamera);
-        // this.showCountdown();
-      } catch (error) {
-        console.log(error);
-      }
-    } else {
-      console.log('not first run');
-      // this.showCountdown();
-    }
-  }
-
-  startGame(unPauseCamera) {
-    unPauseCamera();
-    this.setState({
-      isRunning: true
-    });
-
-    this.timerAtStartOfRound = this.timer;
-    this.timerInterval = window.setInterval(() => {
-      this.handleGameTimerCountdown();
-    }, GAME_TIMER_DELAY);
-  }
-
-  handleGameTimerCountdown() {
-    if (this.timer === 0) {
-      window.clearInterval(this.timerInterval);
-
-      // window.gtag('event', 'Failure', {
-      //   event_category: 'Emoji',
-      //   event_label: `${this.currentEmoji.emoji} - ${this.currentEmoji.name}`
-      // });
-
-      // if (this.score === 0) {
-      //   ui.showNoItemsFoundView();
-      // } else {
-      //   ui.showXItemsFoundView(this.endGamePhotos);
-      // }
-    } else if (this.timer <= 5) {
-      // if (this.timer === 5) {
-      //   this.playAudio(AUDIO.TIME_RUNNING_LOW);
-      // }
-      // ui.updateTimer(this.timer, false, true);
-    } else {
-      // ui.updateTimer(this.timer);
-    }
-
-    this.timer--;
-  }
-
-  handleStartClick(ev) {
-    this.startGame();
-  }
-
   render() {
-    const { currentEmoji, emojisFound } = this.state;
+    const {
+      currentEmoji,
+      score,
+      timer,
+      isLoading,
+      countdown,
+      isCountdown,
+      currentPage,
+      didUserFound,
+      endGamePhotos,
+      isGamePaused,
+      doSnapShotNow
+    } = this.state;
 
     return (
-      <Router>
-        <div className="App">
-          {Object.keys(currentEmoji).length ? (
-            <div className="App__current-emoji">
-              <span>{currentEmoji.name}</span>
-              <span>{currentEmoji.emoji}</span>
-              <span>{emojisFound.length}</span>
-            </div>
-          ) : null}
-          <Link to="/camera" onClick={this.handleStartClick}>
-            go to camera
-          </Link>
-          <Route
-            path="/camera"
-            render={props => (
-              <Camera {...props} onLoadedMetadata={this.onInitGame} />
+      <div className="App">
+        {isLoading && <Loader />}
+        {currentPage === 'intro' && (
+          <Intro onPlayClick={this.handlePlayClick} />
+        )}
+        {currentPage === 'game' && (
+          <Fragment>
+            {Object.keys(currentEmoji).length ? (
+              <StatusBar
+                currentEmoji={currentEmoji}
+                score={score}
+                timer={timer}
+              />
+            ) : null}
+            <Camera
+              isGamePaused={isGamePaused}
+              doSnapShotNow={doSnapShotNow}
+              onLoadedMetadata={this.onInitGame}
+              onSnapShot={this.handleSnapShot}
+            />
+            {isCountdown && <Countdown countdown={countdown} />}
+            {didUserFound && (
+              <PopUpMenu
+                emoji="👍"
+                text="You did it!"
+                buttonText="NEXT EMOJI"
+                onButtonClick={this.handleNextClick}
+              />
             )}
+          </Fragment>
+        )}
+        {currentPage === 'finish' && (
+          <Finish
+            endGamePhotos={endGamePhotos}
+            onHomeClick={this.moveToIntro}
+            onTryAgainClick={this.playGameAgain}
           />
-        </div>
-      </Router>
+        )}
+      </div>
     );
   }
 }
+
+export default App;
