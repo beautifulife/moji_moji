@@ -33,27 +33,23 @@ button {
 }
 
 .App {
+  display: flex;
+  flex-direction: column;
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   left: 0;
   background-color: black;
-
-  &__current-emoji {
-    z-index: 1000;
-    color: white;
-    background-color: black;
-  }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 650px) {
   html {
     font-size: 80%;
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 500px) {
   html {
     font-size: 70%;
   }
@@ -61,12 +57,12 @@ button {
 
 @media (max-width: 400px) {
   html {
-    font-size: 60%;
+    font-size: 65%;
   }
 }
 
 @media (max-width: 350px) {
   html {
-    font-size: 50%;
+    font-size: 55%;
   }
 }

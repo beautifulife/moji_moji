@@ -1,9 +1,15 @@
 import React, { Fragment } from 'react';
+import './Button.scss';
 
-const Button = ({ onClick = null, onSubmit = null, children = null }) => {
+const Button = ({ className = 'Button', onClick = null, onSubmit = null, children = null }) => {
   return (
     <Fragment>
-      <button type="button" onClick={onClick} onSubmit={onSubmit}>
+      <button
+        type="button"
+        className={`Button ${className}`}
+        onClick={onClick}
+        onSubmit={onSubmit}
+      >
         {children}
       </button>
     </Fragment>

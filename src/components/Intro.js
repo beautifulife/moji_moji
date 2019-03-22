@@ -1,21 +1,9 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import './Intro.scss';
 import Button from './Button';
-import Divider from './Divider';
-import imoticon1 from '../assets/images/title_imoticon_img1.png';
-import imoticon2 from '../assets/images/title_imoticon_img2.png';
 
-const Intro = ({ onPlayClick }) => {
-  const styles = {
-    imoticons: {
-      width: '3.5rem',
-      height: 'auto',
-      margin: '0 1rem'
-    }
-  };
-
+const Intro = ({ onPlayClick, history }) => {
   function handlePlayClick(ev) {
-    console.log('play');
     onPlayClick();
   }
 
@@ -25,22 +13,16 @@ const Intro = ({ onPlayClick }) => {
 
   return (
     <div className="Intro">
-      <div className="Intro__body">
-        <h1 className="Intro__body__title">
-          <img src={imoticon1} alt="smile" style={styles.imoticons} />
-          <span>Moji_Moji</span>
-          <img src={imoticon2} alt="love" style={styles.imoticons} />
-        </h1>
-        <p className="Intro__body__description">
-          find the emoji in the real world and broadcast your actions
-        </p>
-        <Link to="/camera">
-          <Button onClick={handlePlayClick}>Let's play!</Button>
-        </Link>
-        <Link to="/camera">
-          <Button onClick={handleWatchClick}>Let's Watch!</Button>
-        </Link>
-      </div>
+      <h1 className="Intro__title">
+        <span className="emoji" role="img" aria-label="bright">🤩</span>
+        <span className="text">Moji_Moji</span>
+        <span className="emoji" role="img" aria-label="lovely">😍</span>
+      </h1>
+      <p className="Intro__description">
+        find the emoji in the real world and broadcast your actions
+      </p>
+      <Button className="main-btn" onClick={handlePlayClick}>Let's play!</Button>
+      <Button className="main-btn" onClick={handleWatchClick}>Let's Watch!</Button>
     </div>
   );
 };

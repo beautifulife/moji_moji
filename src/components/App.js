@@ -1,16 +1,16 @@
 import React, { Component, Fragment } from 'react';
-import {
-  BrowserRouter as Router,
-  Route,
-  Redirect,
-  Switch
-} from 'react-router-dom';
 import * as tfc from '@tensorflow/tfjs-core';
 import { shuffle } from 'lodash';
 import io from 'socket.io-client';
+import './App.scss';
+
 import Camera from './Camera';
+import Countdown from './Countdown';
+import Finish from './Finish';
 import Intro from './Intro';
 import Loader from './Loader';
+import PopUpMenu from './PopUpMenu';
+import StatusBar from './StatusBar';
 
 import {
   GAME_MAX_ITEMS,
@@ -29,26 +29,31 @@ import {
   EMOJIS_LVL_DEMO
 } from '../utils/game_levels';
 
-export default class App extends Component {
+class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      endpoint: '192.168.0.35:3000',
       color: 'transparent',
+      countdown: 3,
       currentEmoji: {},
-      endGamePhotos: [],
+      currentPage: 'intro',
+      didUserFound: false,
+      doSnapShotNow: false,
       emojisFound: [],
-      score: 0,
+      endpoint: 'localhost:3000',
+      endGamePhotos: [],
+      isCountdown: false,
+      isGamePaused: false,
       isLoading: false,
+      score: 0,
       timer: GAME_START_TIME
     };
 
-    this.topKemojiName = '';
+    this.currentLvlIndex = 0;
+    this.gameDifficulty = '1121222345';
     this.isFirstRun = true;
     this.isRunning = false;
-    this.gameDifficulty = '1121222345';
-    this.currentLvlIndex = 0;
-    this.gameIsPaused = false;
+    this.topKemojiName = '';
 
     this.emojiDemo = EMOJIS_DEMO;
     this.emojiLvl1 = shuffle(EMOJIS_LVL_1);
@@ -67,28 +72,26 @@ export default class App extends Component {
       '#': this.emojiLvlDemo
     };
 
+    this.handleNextClick = this.handleNextClick.bind(this);
+    this.handlePlayClick = this.handlePlayClick.bind(this);
+    this.handleSnapShot = this.handleSnapShot.bind(this);
+    this.moveToIntro = this.moveToIntro.bind(this);
     this.onInitGame = this.onInitGame.bind(this);
-    this.handleStartClick = this.handleStartClick.bind(this);
+    this.playGameAgain = this.playGameAgain.bind(this);
     this.send = this.send.bind(this);
     this.startGame = this.startGame.bind(this);
+    this.startLoading = this.startLoading.bind(this);
+    this.termintateLoading = this.termintateLoading.bind(this);
   }
 
   componentDidMount() {
     const { endpoint } = this.state;
-    const socket = io(endpoint, { secure: true });
+    // const socket = io(endpoint, { secure: true });
 
-    setInterval(this.send(), 1000);
-    socket.on('color', col => {
-      document.body.style.backgroundColor = col;
-      console.log('got message', col);
-    });
-  }
-
-  send() {
-    const { endpoint, color } = this.state;
-
-    const socket = io(endpoint);
-    socket.emit('color', color); // change 'red' to this.state.color
+    // socket.on('color', col => {
+    //   document.body.style.backgroundColor = col;
+    //   console.log('got message', col);
+    // });
   }
 
   checkEmojiMatch(emojiNameTop1, emojiNameTop2) {
@@ -106,33 +109,55 @@ export default class App extends Component {
     }
   }
 
+  countdown(count) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        if (count === 0) {
+          if (!this.isRunning) {
+            this.startGame();
+          }
+
+          this.setState({
+            isCountdown: false
+          });
+        } else {
+          this.setState({
+            isLoading: false,
+            isCountdown: true,
+            countdown: count
+          });
+        }
+        resolve(count);
+      }, 1000);
+    });
+  }
+
   emojiFound() {
-    const { currentEmoji, emojisFound, endGamePhotos, score } = this.state;
+    const { currentEmoji, emojisFound, score } = this.state;
 
     this.pauseGame();
-
-    const photo = this.saveAnswer();
-
     this.setState({
       score: score + 1,
       emojisFound: [...emojisFound, currentEmoji],
-      endGamePhotos: [...endGamePhotos, photo]
+      doSnapShotNow: true,
     });
 
-    // ui.cameraFlash();
-
     if (GAME_MAX_ITEMS === score) {
-      this.showAllItemsFoundView(this.endGamePhotos);
+      this.setState({
+        currentPage: 'finish'
+      });
     } else {
       setTimeout(() => {
         this.showItemFoundView();
-      }, 1000);
+      }, 500);
     }
   }
 
   showItemFoundView() {
-    // this.showView(VIEWS.FOUND_ITEM);
     this.extendTimer();
+    this.setState({
+      didUserFound: true
+    });
   }
 
   updateTimer(value) {
@@ -157,10 +182,47 @@ export default class App extends Component {
     for (let i = timer + 2; i < maxTimer; i++) {
       await this.delayedUpdateTimer(i);
     }
+  }
 
-    // this.setState({
-    //   timer: maxTimer - 1
-    // });
+  handleGameTimerCountdown() {
+    const { timer } = this.state;
+
+    if (timer === 0) {
+      window.clearInterval(this.timerInterval);
+      this.showFoundView();
+    } else {
+      this.setState({
+        timer: timer - 1
+      });
+    }
+  }
+
+  handlePlayClick() {
+    this.setState({
+      isLoading: true,
+      currentPage: 'game'
+    });
+  }
+
+  handleNextClick() {
+    this.showCountdown();
+    this.nextEmoji();
+  }
+
+  handleSnapShot(img) {
+    const { endGamePhotos } = this.state;
+
+    this.setState({
+      doSnapShotNow: false,
+      endGamePhotos: [...endGamePhotos, img]
+    });
+  }
+
+  moveToIntro() {
+    this.resetGame();
+    this.setState({
+      currentPage: 'intro'
+    });
   }
 
   nextEmoji() {
@@ -170,12 +232,10 @@ export default class App extends Component {
 
     const curLvl = this.gameDifficulty[this.currentLvlIndex];
     let lvlArray = this.emojiLvlLookup[curLvl];
-    // let nextEmoji = lvlArray.shift();
-    let nextEmoji = this.emojiDemo.shift();
+    let nextEmoji = lvlArray.shift();
+    // for demo
+    // let nextEmoji = this.emojiDemo.shift();
 
-    // If we have selected all possible emojis from a particular level,
-    // reshuffle the list of possible emoji for that level and request a new
-    // next emoji.
     if (nextEmoji === undefined) {
       this.reShuffleLevelEmojis(curLvl);
       lvlArray = this.emojiLvlLookup[curLvl];
@@ -187,23 +247,52 @@ export default class App extends Component {
     this.setState({
       currentEmoji: nextEmoji
     });
-
-    // ui.setActiveEmoji(this.currentEmoji.path);
   }
 
-  pauseGame(pauseCamera) {
+  async onInitGame(videoRef) {
+    const { emojiMobileNet } = this.props;
+
+    try {
+      await emojiMobileNet.load();
+      await this.warmUpModel();
+
+      this.isFirstRun = false;
+
+      this.nextEmoji();
+      this.predict(videoRef);
+      this.showCountdown();
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  pauseCamera() {
+    this.setState({
+      isGamePaused: true
+    });
+  }
+
+
+  pauseGame() {
     if (this.isRunning) {
-      pauseCamera();
+      this.pauseCamera();
     }
 
-    this.gameIsPaused = true;
-    this.isRunning = false;
+    this.setState({
+      isGamePaused: true
+    });
 
-    // this.startGame();
-    this.nextEmoji();
+    this.isRunning = false;
 
     window.clearInterval(this.timerInterval);
     window.clearInterval(this.speakInterval);
+  }
+
+  playGameAgain() {
+    this.resetGame();
+    this.setState({
+      currentPage: 'game'
+    });
   }
 
   async predict(videoRef) {
@@ -227,10 +316,35 @@ export default class App extends Component {
       const topK = await emojiMobileNet.getTopKClasses(result, 10);
 
       // Match the top 2 matches against our current active emoji.
+      console.log(...topK);
       this.checkEmojiMatch(topK[0].label, topK[1].label);
     }
 
     window.requestAnimationFrame(() => this.predict(videoRef));
+  }
+
+  resumeGame() {
+    const { isGamePaused } = this.state;
+
+    if (isGamePaused) {
+      this.startGame();
+    }
+  }
+
+  resetGame() {
+    this.nextEmoji();
+    this.updateTimer(GAME_START_TIME);
+
+    this.setState({
+      score: 0,
+      timer: GAME_START_TIME,
+      emojisFound: [],
+      endGamePhotos: []
+    });
+
+    this.currentLvlIndex = 0;
+    this.timerAtStartOfRound = GAME_START_TIME;
+    this.topKemojiName = '';
   }
 
   reShuffleLevelEmojis(level) {
@@ -257,12 +371,80 @@ export default class App extends Component {
         break;
       default:
         throw new Error(
-          'Error: expected ' +
-            level +
-            ' level string in the ' +
-            'level EmojiLevelsLookup'
+          `Error: expected ${level} level string in the level EmojiLevelsLookup`
         );
     }
+  }
+
+  async showCountdown() {
+    const { timer } = this.state;
+
+    if (this.isRunning) {
+      this.isRunning = false;
+    }
+
+    this.updateTimer(timer, true);
+
+    await this.countdown(3);
+    await this.countdown(2);
+    await this.countdown(1);
+    await this.countdown(0);
+  }
+
+  startGame() {
+    const { timer, didUserFound } = this.state;
+
+    if (didUserFound) {
+      this.setState({
+        didUserFound: false
+      });
+    }
+
+    if (!this.isRunning) {
+      this.unPauseCamera();
+    }
+
+    this.isRunning = true;
+    this.timerAtStartOfRound = timer;
+    this.timerInterval = window.setInterval(() => {
+      this.handleGameTimerCountdown();
+    }, GAME_TIMER_DELAY);
+  }
+
+  send() {
+    const { endpoint, color } = this.state;
+
+    const socket = io(endpoint);
+    socket.emit('color', color);
+  }
+
+  showFoundView() {
+    this.pauseGame();
+
+    this.setState(
+      {
+        currentPage: 'finish'
+      },
+      this.updateTimer.bind(this, GAME_START_TIME)
+    );
+  }
+
+  startLoading() {
+    this.setState({
+      isLoading: true
+    });
+  }
+
+  termintateLoading() {
+    this.setState({
+      isLoading: false
+    });
+  }
+
+  unPauseCamera() {
+    this.setState({
+      isGamePaused: false
+    });
   }
 
   warmUpModel() {
@@ -271,115 +453,63 @@ export default class App extends Component {
     emojiMobileNet.predict(tfc.zeros([VIDEO_PIXELS, VIDEO_PIXELS, 3]));
   }
 
-  async onInitGame(videoRef, pauseCamera, unPauseCamera, snapshot) {
-    const { emojiMobileNet } = this.props;
-
-    if (this.isFirstRun) {
-      try {
-        await emojiMobileNet.load();
-        await this.warmUpModel();
-
-        this.isFirstRun = false;
-        this.isRunning = true;
-
-        this.nextEmoji();
-        this.predict(videoRef);
-        this.pauseGame = this.pauseGame.bind(this, pauseCamera);
-        this.startGame = this.startGame.bind(this, unPauseCamera);
-        this.saveAnswer = this.saveAnswer.bind(this, snapshot);
-
-        // this.showCountdown();
-      } catch (error) {
-        console.log(error);
-      }
-    } else {
-      console.log('not first run');
-      // this.showCountdown();
-    }
-  }
-
-  saveAnswer(snapshot) {
-    return snapshot();
-  }
-
-  startGame(unPauseCamera) {
-    const { timer } = this.state;
-
-    if (!this.isRunning && !this.isFirstRun) {
-      unPauseCamera();
-    }
-
-    this.isRunning = true;
-
-    this.timerAtStartOfRound = timer;
-    this.timerInterval = window.setInterval(() => {
-      this.handleGameTimerCountdown();
-    }, GAME_TIMER_DELAY);
-  }
-
-  handleGameTimerCountdown() {
-    const { timer, endGamePhotos } = this.state;
-
-    if (timer === 0) {
-      console.log(this.timerInterval);
-      window.clearInterval(this.timerInterval);
-
-      if (this.score === 0) {
-        // ui.showNoItemsFoundView();
-      } else {
-        // ui.showXItemsFoundView(this.endGamePhotos);
-        console.log(endGamePhotos[0].currentSrc);
-      }
-    } else if (timer <= 5) {
-      // if (this.timer === 5) {
-      //   this.playAudio(AUDIO.TIME_RUNNING_LOW);
-      // }
-      // ui.updateTimer(this.timer, false, true);
-    } else {
-      // ui.updateTimer(this.timer);
-    }
-
-    this.setState({
-      timer: timer - 1
-    });
-  }
-
-  handleStartClick(ev) {
-    this.startGame();
-  }
-
   render() {
-    const { currentEmoji, score, timer, isLoading } = this.state;
+    const {
+      currentEmoji,
+      score,
+      timer,
+      isLoading,
+      countdown,
+      isCountdown,
+      currentPage,
+      didUserFound,
+      endGamePhotos,
+      isGamePaused,
+      doSnapShotNow
+    } = this.state;
 
     return (
-      <Router>
-        <div className="App">
-          {Object.keys(currentEmoji).length ? (
-            <div className="App__current-emoji">
-              <span>current name: {currentEmoji.name}</span>&nbsp;
-              <span>current: {currentEmoji.emoji}</span>
-              <br />
-              <span>expect count: {score}</span>
-              <br />
-              <span>left: {timer}</span>
-            </div>
-          ) : null}
-          {isLoading && <Loader />}
-          <Route
-            exact
-            path="/"
-            render={props => (
-              <Intro {...props} onPlayClick={this.handleStartClick} />
+      <div className="App">
+        {isLoading && <Loader />}
+        {currentPage === 'intro' && (
+          <Intro onPlayClick={this.handlePlayClick} />
+        )}
+        {currentPage === 'game' && (
+          <Fragment>
+            {Object.keys(currentEmoji).length ? (
+              <StatusBar
+                currentEmoji={currentEmoji}
+                score={score}
+                timer={timer}
+              />
+            ) : null}
+            <Camera
+              isGamePaused={isGamePaused}
+              doSnapShotNow={doSnapShotNow}
+              onLoadedMetadata={this.onInitGame}
+              onSnapShot={this.handleSnapShot}
+            />
+            {isCountdown && <Countdown countdown={countdown} />}
+            {didUserFound && (
+              <PopUpMenu
+                emoji="👍"
+                text="You did it!"
+                buttonText="NEXT EMOJI"
+                onButtonClick={this.handleNextClick}
+              />
             )}
+          </Fragment>
+        )}
+        {currentPage === 'finish' && (
+          <Finish
+            endGamePhotos={endGamePhotos}
+            onHomeClick={this.moveToIntro}
+            onTryAgainClick={this.playGameAgain}
           />
-          <Route
-            path="/camera"
-            render={props => (
-              <Camera {...props} onLoadedMetadata={this.onInitGame} />
-            )}
-          />
-        </div>
-      </Router>
+        )}
+      </div>
     );
   }
 }
+
+export default App;

@@ -16,9 +16,6 @@
  * =============================================================================
  */
 
-$c-camera-capture-flash: rgb(0, 253, 36);
-$c-camera-capture-bg: rgba(0, 253, 36, 0.4);
-
 @keyframes flash-animation {
   from {
     opacity: 0;
@@ -38,7 +35,7 @@ $c-camera-capture-bg: rgba(0, 253, 36, 0.4);
 
   &.capture {
     border: black solid;
-    border-width: 90px 30px 30px 30px;
+    border-width: 110px 40px 40px 40px;
   }
 
   &__video {
@@ -65,15 +62,18 @@ $c-camera-capture-bg: rgba(0, 253, 36, 0.4);
     bottom: 0;
     right: 0;
     z-index: 10;
+    background: rgb(0, 253, 36);
+    animation-name: flash-animation;
+    animation-duration: 0.1s;
+    mix-blend-mode: multiply;
+  }
+}
 
-    &.flash {
-      background: $c-camera-capture-flash;
-      animation-name: flash-animation;
-      animation-duration: 0.1s;
-
-      &.freeze {
-        mix-blend-mode: multiply;
-      }
-    }
+@keyframes flash-animation {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

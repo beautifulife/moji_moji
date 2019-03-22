@@ -1,0 +1,29 @@
+.Countdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+
+  &.count3 {
+    background-color: red;
+  }
+
+  &.count2 {
+    background-color: blue
+  }
+
+  &.count1 {
+    background-color: green;
+  }
+
+  &__text {
+    font-size: 15rem;
+    font-weight: bold;
+    color: white;
+  }
+}
