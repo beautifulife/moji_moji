@@ -12,6 +12,7 @@ export default class Camera extends Component {
     };
     this.snapShotCanvas = document.createElement('canvas');
     this.videoRef = React.createRef();
+    this.videoRef2 = React.createRef();
 
     this.handleOnLoadedMetadata = this.handleOnLoadedMetadata.bind(this);
     this.pauseCamera = this.pauseCamera.bind(this);
@@ -66,7 +67,13 @@ export default class Camera extends Component {
         video: { facingMode: 'environment' }
       });
 
+      const stream2 = await navigator.mediaDevices.getDisplayMedia({
+        video: true
+      });
+
+      window.stream2 = stream;
       window.stream = stream;
+      this.videoRef2.current.srcObject = stream2;
       this.videoRef.current.srcObject = stream;
     }
   }
@@ -125,6 +132,14 @@ export default class Camera extends Component {
 
   render() {
     const { isCameraFront, isCameraPaused } = this.state;
+    const style = {
+      position: 'fixed',
+      bottom: 0,
+      right: 0,
+      zIndex: '300',
+      width: '100px',
+      height: '100px'
+    };
 
     return (
       <div className={isCameraPaused ? 'Camera capture' : 'Camera'}>
@@ -141,6 +156,14 @@ export default class Camera extends Component {
           autoPlay={true}
           playsInline={true}
           onLoadedMetadata={this.handleOnLoadedMetadata}
+        >
+          <track kind="captions" />
+        </video>
+        <video
+          ref={this.videoRef2}
+          style={style}
+          autoPlay={true}
+          playsInline={true}
         >
           <track kind="captions" />
         </video>

@@ -11,6 +11,7 @@ import Intro from './Intro';
 import Loader from './Loader';
 import PopUpMenu from './PopUpMenu';
 import StatusBar from './StatusBar';
+import VideoTest from './VideoTest';
 
 import {
   GAME_MAX_ITEMS,
@@ -75,6 +76,7 @@ class App extends Component {
     this.handleNextClick = this.handleNextClick.bind(this);
     this.handlePlayClick = this.handlePlayClick.bind(this);
     this.handleSnapShot = this.handleSnapShot.bind(this);
+    this.handleWatchClick = this.handleWatchClick.bind(this);
     this.moveToIntro = this.moveToIntro.bind(this);
     this.onInitGame = this.onInitGame.bind(this);
     this.playGameAgain = this.playGameAgain.bind(this);
@@ -215,6 +217,12 @@ class App extends Component {
     this.setState({
       doSnapShotNow: false,
       endGamePhotos: [...endGamePhotos, img]
+    });
+  }
+
+  handleWatchClick() {
+    this.setState({
+      currentPage: 'video-test'
     });
   }
 
@@ -471,7 +479,10 @@ class App extends Component {
       <div className="App">
         {isLoading && <Loader />}
         {currentPage === 'intro' && (
-          <Intro onPlayClick={this.handlePlayClick} />
+          <Intro
+            onPlayClick={this.handlePlayClick}
+            onWatchClick={this.handleWatchClick}
+          />
         )}
         {currentPage === 'game' && (
           <Fragment>
@@ -506,6 +517,7 @@ class App extends Component {
             onTryAgainClick={this.playGameAgain}
           />
         )}
+        {currentPage === 'video-test' && <VideoTest />}
       </div>
     );
   }
