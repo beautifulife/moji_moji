@@ -2,7 +2,7 @@ import React from 'react';
 import './Intro.scss';
 import Button from './Button';
 
-const Intro = ({ onPlayClick, onWatchClick, history }) => {
+const Intro = ({ onBroadcastClick, onPlayClick, onWatchClick }) => {
   return (
     <div className="Intro">
       <h1 className="Intro__title">
@@ -19,6 +19,9 @@ const Intro = ({ onPlayClick, onWatchClick, history }) => {
       </p>
       <Button className="main-btn" onClick={onPlayClick}>
         Let's play!
+      </Button>
+      <Button className="main-btn" onClick={onBroadcastClick}>
+        Let's broadcast!
       </Button>
       <Button className="main-btn" onClick={onWatchClick}>
         Let's Watch!

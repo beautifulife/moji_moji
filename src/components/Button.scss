@@ -2,10 +2,11 @@
   &.main-btn {
     text-align: center;
     width: 150px;
-    margin: 10px 0;
+    margin-top: 20px;
     padding: 0.8rem;
     font-size: 20px;
     color: rgb(190, 190, 190);
+    border: 0.1px solid transparent;
     box-shadow: 0 0 0.2rem #fff, inset 0 0 0.2rem #fff, 0 0 0.5rem #08f,
       inset 0 0 0.5rem #08f, 0 0 1rem #08f, inset 0 0 1rem #08f;
     transition: all 0.2s ease-in-out;

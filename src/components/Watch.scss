@@ -1,4 +1,4 @@
-.VideoTest {
+.Watch {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10,17 +10,8 @@
   z-index: 2000;
   background-color: white;
 
-  video {
-    margin: 10px;
-  }
-
   &__video {
-    width: 300px;
-    height: auto;
-  }
-
-  &__video-peer {
-    width: 300px;
-    height: auto;
+    width: 100%;
+    height: 100%;
   }
 }

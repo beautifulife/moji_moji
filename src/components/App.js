@@ -11,7 +11,7 @@ import Intro from './Intro';
 import Loader from './Loader';
 import PopUpMenu from './PopUpMenu';
 import StatusBar from './StatusBar';
-import VideoTest from './VideoTest';
+import Watch from './Watch';
 
 import {
   GAME_MAX_ITEMS,
@@ -34,14 +34,12 @@ class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      color: 'transparent',
       countdown: 3,
       currentEmoji: {},
       currentPage: 'intro',
       didUserFound: false,
       doSnapShotNow: false,
       emojisFound: [],
-      endpoint: 'localhost:3000',
       endGamePhotos: [],
       isCountdown: false,
       isGamePaused: false,
@@ -50,6 +48,7 @@ class App extends Component {
       timer: GAME_START_TIME
     };
 
+    this.endpoint = '192.168.0.39:3000';
     this.currentLvlIndex = 0;
     this.gameDifficulty = '1121222345';
     this.isFirstRun = true;
@@ -73,6 +72,9 @@ class App extends Component {
       '#': this.emojiLvlDemo
     };
 
+    this.createPeerConnection = this.createPeerConnection.bind(this);
+    this.createSignalingChannel = this.createSignalingChannel.bind(this);
+    this.handleBroadcastClick = this.handleBroadcastClick.bind(this);
     this.handleNextClick = this.handleNextClick.bind(this);
     this.handlePlayClick = this.handlePlayClick.bind(this);
     this.handleSnapShot = this.handleSnapShot.bind(this);
@@ -80,20 +82,10 @@ class App extends Component {
     this.moveToIntro = this.moveToIntro.bind(this);
     this.onInitGame = this.onInitGame.bind(this);
     this.playGameAgain = this.playGameAgain.bind(this);
-    this.send = this.send.bind(this);
+    this.sendMessage = this.sendMessage.bind(this);
     this.startGame = this.startGame.bind(this);
     this.startLoading = this.startLoading.bind(this);
     this.termintateLoading = this.termintateLoading.bind(this);
-  }
-
-  componentDidMount() {
-    const { endpoint } = this.state;
-    // const socket = io(endpoint, { secure: true });
-
-    // socket.on('color', col => {
-    //   document.body.style.backgroundColor = col;
-    //   console.log('got message', col);
-    // });
   }
 
   checkEmojiMatch(emojiNameTop1, emojiNameTop2) {
@@ -132,6 +124,76 @@ class App extends Component {
         resolve(count);
       }, 1000);
     });
+  }
+
+  createPeerConnection() {
+    const myPeerConnection = new RTCPeerConnection();
+
+    myPeerConnection.onicecandidate = event => {
+      console.log('handleIceCandidate event: ', event);
+      if (event.candidate) {
+        this.socket.emit('message', {
+          type: 'candidate',
+          candidate: event.candidate
+        });
+      } else {
+        console.log('End of candidates.');
+      }
+    };
+
+    myPeerConnection.onaddstream = event => {
+      console.log('Remote stream added.');
+      window.watcherStream = event.stream;
+
+      console.log(event.stream);
+
+      this.setState({
+        currentPage: 'watch'
+      });
+    };
+
+    return myPeerConnection;
+  }
+
+  createSignalingChannel() {
+    this.socket = io(this.endpoint, { secure: true });
+
+    this.socket.on('message', message => {
+      console.log('Received message:', message);
+      if (message.type === 'offer') {
+        console.log('offer coming');
+        this.handleVideoOfferMsg(message);
+      } else if (message.type === 'answer') {
+        console.log('answer', message);
+        this.watcherPeerConnection.setRemoteDescription(
+          new RTCSessionDescription(message)
+        );
+      } else if (message.type === 'candidate') {
+        // const candidate = new RTCIceCandidate({
+        //   sdpMLineIndex: message.label,
+        //   candidate: message.candidate
+        // });
+        if (this.watcherPeerConnection) {
+          this.watcherPeerConnection.addIceCandidate(message.candidate);
+        } else {
+          this.playerPeerConnection.addIceCandidate(message.candidate);
+        }
+      }
+    });
+  }
+
+  async setupBroadcastCamera() {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      // const stream = await navigator.mediaDevices.getDisplayMedia({
+      //   video: true
+      // });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: 'environment' }
+      });
+
+      window.playerStream = stream;
+    }
   }
 
   emojiFound() {
@@ -186,6 +248,13 @@ class App extends Component {
     }
   }
 
+  async handleBroadcastClick() {
+    await this.createSignalingChannel();
+    await this.setupBroadcastCamera();
+
+    window.alert('broadcast ready!');
+  }
+
   handleGameTimerCountdown() {
     const { timer } = this.state;
 
@@ -220,10 +289,46 @@ class App extends Component {
     });
   }
 
+  async handleVideoOfferMsg(msg) {
+    const playerStream = window.playerStream;
+    const playerPeerConnection = this.createPeerConnection();
+    this.playerPeerConnection = playerPeerConnection;
+    const desc = new RTCSessionDescription(msg);
+
+    try {
+      await playerPeerConnection.setRemoteDescription(desc);
+      await playerStream.getTracks().forEach(track => {
+        playerPeerConnection.addTrack(track, playerStream);
+      });
+      const answer = await playerPeerConnection.createAnswer();
+      await playerPeerConnection.setLocalDescription(answer);
+      this.sendMessage(playerPeerConnection.localDescription);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   handleWatchClick() {
-    this.setState({
-      currentPage: 'video-test'
-    });
+    this.createSignalingChannel();
+    this.makeVideoOffer();
+    window.alert('ready to watch!');
+  }
+
+  async makeVideoOffer() {
+    const watcherPeerConnection = await this.createPeerConnection();
+    this.watcherPeerConnection = watcherPeerConnection;
+
+    try {
+      const offer = await watcherPeerConnection.createOffer({
+        offerToReceiveVideo: true
+      });
+
+      await watcherPeerConnection.setLocalDescription(offer);
+      this.sendMessage(watcherPeerConnection.localDescription);
+    } catch (err) {
+      console.error(err);
+      // this.handleGetUserMediaError(err);
+    }
   }
 
   moveToIntro() {
@@ -418,11 +523,9 @@ class App extends Component {
     }, GAME_TIMER_DELAY);
   }
 
-  send() {
-    const { endpoint, color } = this.state;
-
-    const socket = io(endpoint);
-    socket.emit('color', color);
+  sendMessage(message) {
+    console.log('Sending message: ', message);
+    this.socket.emit('message', message);
   }
 
   showFoundView() {
@@ -480,6 +583,7 @@ class App extends Component {
         {isLoading && <Loader />}
         {currentPage === 'intro' && (
           <Intro
+            onBroadcastClick={this.handleBroadcastClick}
             onPlayClick={this.handlePlayClick}
             onWatchClick={this.handleWatchClick}
           />
@@ -517,7 +621,7 @@ class App extends Component {
             onTryAgainClick={this.playGameAgain}
           />
         )}
-        {currentPage === 'video-test' && <VideoTest />}
+        {currentPage === 'watch' && <Watch />}
       </div>
     );
   }
