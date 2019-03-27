@@ -48,12 +48,13 @@ class App extends Component {
       timer: GAME_START_TIME
     };
 
-    this.endpoint = '192.168.0.39:3000';
     this.currentLvlIndex = 0;
+    this.endpoint = '192.168.0.39:3000';
     this.gameDifficulty = '1121222345';
     this.isFirstRun = true;
     this.isRunning = false;
     this.topKemojiName = '';
+    this.userId = (Math.random() * 100).toString().replace('.', '');
 
     this.emojiDemo = EMOJIS_DEMO;
     this.emojiLvl1 = shuffle(EMOJIS_LVL_1);
@@ -86,6 +87,10 @@ class App extends Component {
     this.startGame = this.startGame.bind(this);
     this.startLoading = this.startLoading.bind(this);
     this.termintateLoading = this.termintateLoading.bind(this);
+  }
+
+  componentDidMount() {
+    this.createSignalingChannel();
   }
 
   checkEmojiMatch(emojiNameTop1, emojiNameTop2) {
@@ -126,14 +131,15 @@ class App extends Component {
     });
   }
 
-  createPeerConnection() {
+  createPeerConnection(connectionType) {
     const myPeerConnection = new RTCPeerConnection();
 
     myPeerConnection.onicecandidate = event => {
       console.log('handleIceCandidate event: ', event);
       if (event.candidate) {
-        this.socket.emit('message', {
-          type: 'candidate',
+        this.socket.emit('candidate', {
+          userId: this.userId,
+          connectionType,
           candidate: event.candidate
         });
       } else {
@@ -141,11 +147,13 @@ class App extends Component {
       }
     };
 
-    myPeerConnection.onaddstream = event => {
+    myPeerConnection.ontrack = event => {
       console.log('Remote stream added.');
-      window.watcherStream = event.stream;
+      if (event.streams && event.streams[0]) {
+        window.watcherStream = event.streams[0];
+      }
 
-      console.log(event.stream);
+      console.log(event.streams);
 
       this.setState({
         currentPage: 'watch'
@@ -158,42 +166,104 @@ class App extends Component {
   createSignalingChannel() {
     this.socket = io(this.endpoint, { secure: true });
 
-    this.socket.on('message', message => {
-      console.log('Received message:', message);
-      if (message.type === 'offer') {
-        console.log('offer coming');
-        this.handleVideoOfferMsg(message);
-      } else if (message.type === 'answer') {
-        console.log('answer', message);
-        this.watcherPeerConnection.setRemoteDescription(
-          new RTCSessionDescription(message)
-        );
-      } else if (message.type === 'candidate') {
-        // const candidate = new RTCIceCandidate({
-        //   sdpMLineIndex: message.label,
-        //   candidate: message.candidate
-        // });
-        if (this.watcherPeerConnection) {
-          this.watcherPeerConnection.addIceCandidate(message.candidate);
-        } else {
-          this.playerPeerConnection.addIceCandidate(message.candidate);
-        }
+    this.socket.on('candidate', async message => {
+      console.log('candidate', message);
+      if (message.connectionType === 'player') {
+        this.watcherPeerConnection.addIceCandidate(message.candidate);
+      } else {
+        this.playerPeerConnection.addIceCandidate(message.candidate);
       }
+    });
+
+    this.socket.on('create', async message => {
+      if (message.result === 'exist') {
+        return alert('already exist');
+      }
+
+      await this.setupBroadcastCamera();
+
+      alert(`broadcast '${message.broadcastId}' ready!`);
+    });
+
+    this.socket.on('join', async message => {
+      if (message.result === 'non exist') {
+        return alert('non exist broadcast id');
+      }
+
+      const watcherPeerConnection = await this.createPeerConnection('watcher');
+      this.watcherPeerConnection = watcherPeerConnection;
+
+      try {
+        const offer = await watcherPeerConnection.createOffer({
+          offerToReceiveVideo: true
+        });
+
+        await watcherPeerConnection.setLocalDescription(offer);
+
+        this.socket.emit('offer', {
+          userId: this.userId,
+          broadcastId: message.broadcastId,
+          targetUserId: message.targetUserId,
+          desc: watcherPeerConnection.localDescription
+        });
+
+        alert('ready to watch!');
+      } catch (err) {
+        console.error(err);
+        // this.handleGetUserMediaError(err);
+      }
+    });
+
+    this.socket.on('offer', async message => {
+      const playerStream = window.playerStream;
+      const watcherStream = window.watcherStream;
+      const playerPeerConnection = this.createPeerConnection('player');
+      this.playerPeerConnection = playerPeerConnection;
+      const desc = new RTCSessionDescription(message.desc);
+
+      try {
+        await playerPeerConnection.setRemoteDescription(desc);
+
+        console.log(message.isBroadcastOrigin);
+        if (message.isBroadcastOrigin) {
+          await playerStream.getTracks().forEach(track => {
+            playerPeerConnection.addTrack(track, playerStream);
+          });
+        } else {
+          await watcherStream.getTracks().forEach(track => {
+            playerPeerConnection.addTrack(track, watcherStream);
+          });
+        }
+
+        const answer = await playerPeerConnection.createAnswer();
+        await playerPeerConnection.setLocalDescription(answer);
+
+        this.socket.emit('answer', {
+          userId: this.userId,
+          broadcastId: message.broadcastId,
+          targetUserId: message.targetUserId,
+          desc: playerPeerConnection.localDescription
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    this.socket.on('answer', async message => {
+      console.log('answer', message);
+      this.watcherPeerConnection.setRemoteDescription(
+        new RTCSessionDescription(message.desc)
+      );
     });
   }
 
-  async setupBroadcastCamera() {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      // const stream = await navigator.mediaDevices.getDisplayMedia({
-      //   video: true
-      // });
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: 'environment' }
-      });
-
-      window.playerStream = stream;
-    }
+  delayedUpdateTimer(value) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        this.updateTimer(value);
+        resolve(value);
+      }, 70);
+    });
   }
 
   emojiFound() {
@@ -217,6 +287,20 @@ class App extends Component {
     }
   }
 
+  async setupBroadcastCamera() {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true
+      });
+      // const stream = await navigator.mediaDevices.getUserMedia({
+      //   audio: false,
+      //   video: { facingMode: 'environment' }
+      // });
+
+      window.playerStream = stream;
+    }
+  }
+
   showItemFoundView() {
     this.extendTimer();
     this.setState({
@@ -230,15 +314,6 @@ class App extends Component {
     });
   }
 
-  delayedUpdateTimer(value) {
-    return new Promise(resolve => {
-      setTimeout(() => {
-        this.updateTimer(value);
-        resolve(value);
-      }, 70);
-    });
-  }
-
   async extendTimer() {
     const { timer } = this.state;
     const maxTimer = timer + 1 + GAME_EXTEND_TIME + 1;
@@ -248,11 +323,18 @@ class App extends Component {
     }
   }
 
-  async handleBroadcastClick() {
-    await this.createSignalingChannel();
-    await this.setupBroadcastCamera();
+  handleBroadcastClick() {
+    const broadcastId = prompt('make broadcast id');
 
-    window.alert('broadcast ready!');
+    if (broadcastId.replace(/^\s+|\s+$/g, '').length <= 0) {
+      alert('Please enter broadcast id');
+      return;
+    }
+
+    this.socket.emit('create', {
+      userId: this.userId,
+      broadcastId
+    });
   }
 
   handleGameTimerCountdown() {
@@ -289,46 +371,18 @@ class App extends Component {
     });
   }
 
-  async handleVideoOfferMsg(msg) {
-    const playerStream = window.playerStream;
-    const playerPeerConnection = this.createPeerConnection();
-    this.playerPeerConnection = playerPeerConnection;
-    const desc = new RTCSessionDescription(msg);
-
-    try {
-      await playerPeerConnection.setRemoteDescription(desc);
-      await playerStream.getTracks().forEach(track => {
-        playerPeerConnection.addTrack(track, playerStream);
-      });
-      const answer = await playerPeerConnection.createAnswer();
-      await playerPeerConnection.setLocalDescription(answer);
-      this.sendMessage(playerPeerConnection.localDescription);
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
   handleWatchClick() {
-    this.createSignalingChannel();
-    this.makeVideoOffer();
-    window.alert('ready to watch!');
-  }
+    const broadcastId = prompt('input broadcast id');
 
-  async makeVideoOffer() {
-    const watcherPeerConnection = await this.createPeerConnection();
-    this.watcherPeerConnection = watcherPeerConnection;
-
-    try {
-      const offer = await watcherPeerConnection.createOffer({
-        offerToReceiveVideo: true
-      });
-
-      await watcherPeerConnection.setLocalDescription(offer);
-      this.sendMessage(watcherPeerConnection.localDescription);
-    } catch (err) {
-      console.error(err);
-      // this.handleGetUserMediaError(err);
+    if (broadcastId.replace(/^\s+|\s+$/g, '').length <= 0) {
+      alert('Please enter broadcast id');
+      return;
     }
+
+    this.socket.emit('join', {
+      broadcastId,
+      userId: this.userId
+    });
   }
 
   moveToIntro() {
