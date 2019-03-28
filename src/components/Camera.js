@@ -1,4 +1,5 @@
 import React, { Component, Fragment } from 'react';
+import PropTypes from 'prop-types';
 import { isMobile } from '../utils/device';
 import { VIDEO_PIXELS } from '../utils/constants';
 import './Camera.scss';
@@ -125,14 +126,6 @@ export default class Camera extends Component {
 
   render() {
     const { isCameraFront, isCameraPaused } = this.state;
-    const style = {
-      position: 'fixed',
-      bottom: 0,
-      right: 0,
-      zIndex: '300',
-      width: '100px',
-      height: '100px'
-    };
 
     return (
       <div className={isCameraPaused ? 'Camera capture' : 'Camera'}>
@@ -156,3 +149,9 @@ export default class Camera extends Component {
     );
   }
 }
+
+Camera.propTypes = {
+  isGamePaused: PropTypes.bool.isRequired,
+  doSnapShotNow: PropTypes.bool.isRequired,
+  onLoadedMetadata: PropTypes.func.isRequired
+};

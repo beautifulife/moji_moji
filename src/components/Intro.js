@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import './Intro.scss';
 import Button from './Button';
 
@@ -28,6 +29,18 @@ const Intro = ({ onBroadcastClick, onPlayClick, onWatchClick }) => {
       </Button>
     </div>
   );
+};
+
+Intro.propTypes = {
+  onBroadcastClick: PropTypes.func,
+  onPlayClick: PropTypes.func,
+  onWatchClick: PropTypes.func
+};
+
+Intro.defaultProps = {
+  onBroadcastClick: () => {},
+  onPlayClick: () => {},
+  onWatchClick: () => {}
 };
 
 export default Intro;

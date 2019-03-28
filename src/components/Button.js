@@ -1,7 +1,8 @@
 import React, { Fragment } from 'react';
+import PropTypes from 'prop-types';
 import './Button.scss';
 
-const Button = ({ className = 'Button', onClick = null, onSubmit = null, children = null }) => {
+const Button = ({ className, onClick, onSubmit, children }) => {
   return (
     <Fragment>
       <button
@@ -14,6 +15,19 @@ const Button = ({ className = 'Button', onClick = null, onSubmit = null, childre
       </button>
     </Fragment>
   );
+};
+
+Button.propTypes = {
+  className: PropTypes.string,
+  onClick: PropTypes.func,
+  onSubmit: PropTypes.func,
+  children: PropTypes.node.isRequired
+};
+
+Button.defaultProps = {
+  className: 'Button',
+  onClick: () => {},
+  onSubmit: () => {},
 };
 
 export default Button;

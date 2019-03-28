@@ -1,7 +1,8 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import './PhotoAlbum.scss';
 
-const PhotoAlbum = ({ endGamePhotos = [] }) => {
+const PhotoAlbum = ({ endGamePhotos }) => {
   function renderEndGamePhotos() {
     return endGamePhotos.map((photo, index) => {
       return (
@@ -20,6 +21,10 @@ const PhotoAlbum = ({ endGamePhotos = [] }) => {
       <ul className="PhotoAlbum__list">{renderEndGamePhotos()}</ul>
     </div>
   );
+};
+
+PhotoAlbum.propTypes = {
+  endGamePhotos: PropTypes.instanceOf(Array).isRequired,
 };
 
 export default PhotoAlbum;

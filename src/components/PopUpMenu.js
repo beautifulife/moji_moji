@@ -1,12 +1,13 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import './PopUpMenu.scss';
 import Button from './Button';
 
 const PopUpMenu = ({
-  emoji = '',
-  text = '',
-  buttonText = '',
-  onButtonClick = null
+  emoji,
+  text,
+  buttonText,
+  onButtonClick,
 }) => {
   return (
     <div className="PopUpMenu">
@@ -19,6 +20,20 @@ const PopUpMenu = ({
       </Button>
     </div>
   );
+};
+
+PopUpMenu.propTypes = {
+  emoji: PropTypes.string,
+  text: PropTypes.string,
+  buttonText: PropTypes.string,
+  onButtonClick: PropTypes.func,
+};
+
+PopUpMenu.defaultProps = {
+  emoji: '',
+  text: '',
+  buttonText: '',
+  onButtonClick: () => {}
 };
 
 export default PopUpMenu;
