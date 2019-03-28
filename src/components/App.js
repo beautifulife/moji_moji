@@ -214,6 +214,25 @@ class App extends Component {
       }
     });
 
+    this.socket.on('re-join', async message => {
+      try {
+        const offer = await this.watcherPeerConnection.createOffer({
+          offerToReceiveVideo: true
+        });
+
+        await this.watcherPeerConnection.setLocalDescription(offer);
+
+        this.socket.emit('re-offer', {
+          userId: this.userId,
+          broadcastId: message.broadcastId,
+          targetUserId: message.targetUserId,
+          desc: this.watcherPeerConnection.localDescription
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
     this.socket.on('offer', async message => {
       const playerStream = window.playerStream;
       const watcherStream = window.watcherStream;
@@ -223,8 +242,6 @@ class App extends Component {
 
       try {
         await playerPeerConnection.setRemoteDescription(desc);
-
-        console.log(message.isBroadcastOrigin);
         if (message.isBroadcastOrigin) {
           await playerStream.getTracks().forEach(track => {
             playerPeerConnection.addTrack(track, playerStream);
@@ -249,8 +266,35 @@ class App extends Component {
       }
     });
 
+    this.socket.on('re-offer', async message => {
+      const desc = new RTCSessionDescription(message.desc);
+
+      try {
+        await this.playerPeerConnection.setRemoteDescription(desc);
+
+        const answer = await this.playerPeerConnection.createAnswer();
+        await this.playerPeerConnection.setLocalDescription(answer);
+
+        this.socket.emit('re-answer', {
+          userId: this.userId,
+          broadcastId: message.broadcastId,
+          targetUserId: message.targetUserId,
+          desc: this.playerPeerConnection.localDescription
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
     this.socket.on('answer', async message => {
       console.log('answer', message);
+      this.watcherPeerConnection.setRemoteDescription(
+        new RTCSessionDescription(message.desc)
+      );
+    });
+
+    this.socket.on('re-answer', async message => {
+      console.log('re-answer', message);
       this.watcherPeerConnection.setRemoteDescription(
         new RTCSessionDescription(message.desc)
       );
