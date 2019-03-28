@@ -1,7 +1,7 @@
 import React, { Component, Fragment } from 'react';
 import * as tfc from '@tensorflow/tfjs-core';
-import { shuffle } from 'lodash';
 import io from 'socket.io-client';
+import PropTypes from 'prop-types';
 import './App.scss';
 
 import Camera from './Camera';
@@ -13,22 +13,8 @@ import PopUpMenu from './PopUpMenu';
 import StatusBar from './StatusBar';
 import Watch from './Watch';
 
-import {
-  GAME_MAX_ITEMS,
-  GAME_START_TIME,
-  GAME_TIMER_DELAY,
-  GAME_EXTEND_TIME,
-  VIDEO_PIXELS
-} from '../utils/constants';
-import {
-  EMOJIS_DEMO,
-  EMOJIS_LVL_1,
-  EMOJIS_LVL_2,
-  EMOJIS_LVL_3,
-  EMOJIS_LVL_4,
-  EMOJIS_LVL_5,
-  EMOJIS_LVL_DEMO
-} from '../utils/game_levels';
+import * as constants from '../utils/constants';
+import * as game from '../utils/game';
 
 class App extends Component {
   constructor(props) {
@@ -45,7 +31,7 @@ class App extends Component {
       isGamePaused: false,
       isLoading: false,
       score: 0,
-      timer: GAME_START_TIME
+      timer: constants.GAME_START_TIME
     };
 
     this.currentLvlIndex = 0;
@@ -56,37 +42,15 @@ class App extends Component {
     this.topKemojiName = '';
     this.userId = (Math.random() * 100).toString().replace('.', '');
 
-    this.emojiDemo = EMOJIS_DEMO;
-    this.emojiLvl1 = shuffle(EMOJIS_LVL_1);
-    this.emojiLvl2 = shuffle(EMOJIS_LVL_2);
-    this.emojiLvl3 = shuffle(EMOJIS_LVL_3);
-    this.emojiLvl4 = shuffle(EMOJIS_LVL_4);
-    this.emojiLvl5 = shuffle(EMOJIS_LVL_5);
-    this.emojiLvlDemo = Array.from(EMOJIS_LVL_DEMO);
-
-    this.emojiLvlLookup = {
-      1: this.emojiLvl1,
-      2: this.emojiLvl2,
-      3: this.emojiLvl3,
-      4: this.emojiLvl4,
-      5: this.emojiLvl5,
-      '#': this.emojiLvlDemo
-    };
-
-    this.createPeerConnection = this.createPeerConnection.bind(this);
-    this.createSignalingChannel = this.createSignalingChannel.bind(this);
     this.handleBroadcastClick = this.handleBroadcastClick.bind(this);
+    this.handleHomeClick = this.handleHomeClick.bind(this);
     this.handleNextClick = this.handleNextClick.bind(this);
     this.handlePlayClick = this.handlePlayClick.bind(this);
     this.handleSnapShot = this.handleSnapShot.bind(this);
+    this.handleTryAgainClick = this.handleTryAgainClick.bind(this);
     this.handleWatchClick = this.handleWatchClick.bind(this);
-    this.moveToIntro = this.moveToIntro.bind(this);
     this.onInitGame = this.onInitGame.bind(this);
-    this.playGameAgain = this.playGameAgain.bind(this);
-    this.sendMessage = this.sendMessage.bind(this);
     this.startGame = this.startGame.bind(this);
-    this.startLoading = this.startLoading.bind(this);
-    this.termintateLoading = this.termintateLoading.bind(this);
   }
 
   componentDidMount() {
@@ -110,8 +74,8 @@ class App extends Component {
 
   countdown(count) {
     return new Promise(resolve => {
-      setTimeout(() => {
-        if (count === 0) {
+      if (count === 0) {
+        setTimeout(() => {
           if (!this.isRunning) {
             this.startGame();
           }
@@ -119,15 +83,17 @@ class App extends Component {
           this.setState({
             isCountdown: false
           });
-        } else {
+        }, 3000);
+      } else {
+        setTimeout(() => {
           this.setState({
             isLoading: false,
             isCountdown: true,
             countdown: count
           });
-        }
-        resolve(count);
-      }, 1000);
+          resolve(count);
+        }, 1000);
+      }
     });
   }
 
@@ -153,8 +119,6 @@ class App extends Component {
         window.watcherStream = event.streams[0];
       }
 
-      console.log(event.streams);
-
       this.setState({
         currentPage: 'watch'
       });
@@ -166,7 +130,7 @@ class App extends Component {
   createSignalingChannel() {
     this.socket = io(this.endpoint, { secure: true });
 
-    this.socket.on('candidate', async message => {
+    this.socket.on('candidate', message => {
       console.log('candidate', message);
       if (message.connectionType === 'player') {
         this.watcherPeerConnection.addIceCandidate(message.candidate);
@@ -210,7 +174,6 @@ class App extends Component {
         alert('ready to watch!');
       } catch (err) {
         console.error(err);
-        // this.handleGetUserMediaError(err);
       }
     });
 
@@ -271,7 +234,6 @@ class App extends Component {
 
       try {
         await this.playerPeerConnection.setRemoteDescription(desc);
-
         const answer = await this.playerPeerConnection.createAnswer();
         await this.playerPeerConnection.setLocalDescription(answer);
 
@@ -288,13 +250,6 @@ class App extends Component {
 
     this.socket.on('answer', async message => {
       console.log('answer', message);
-      this.watcherPeerConnection.setRemoteDescription(
-        new RTCSessionDescription(message.desc)
-      );
-    });
-
-    this.socket.on('re-answer', async message => {
-      console.log('re-answer', message);
       this.watcherPeerConnection.setRemoteDescription(
         new RTCSessionDescription(message.desc)
       );
@@ -320,7 +275,7 @@ class App extends Component {
       doSnapShotNow: true
     });
 
-    if (GAME_MAX_ITEMS === score) {
+    if (constants.GAME_MAX_ITEMS === score) {
       this.setState({
         currentPage: 'finish'
       });
@@ -332,16 +287,22 @@ class App extends Component {
   }
 
   async setupBroadcastCamera() {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true
-      });
-      // const stream = await navigator.mediaDevices.getUserMedia({
-      //   audio: false,
-      //   video: { facingMode: 'environment' }
-      // });
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true
+        });
 
-      window.playerStream = stream;
+        // camera selection
+        // const stream = await navigator.mediaDevices.getUserMedia({
+        //   audio: false,
+        //   video: { facingMode: 'environment' }
+        // });
+
+        window.playerStream = stream;
+      }
+    } catch (err) {
+      console.error(err);
     }
   }
 
@@ -360,7 +321,7 @@ class App extends Component {
 
   async extendTimer() {
     const { timer } = this.state;
-    const maxTimer = timer + 1 + GAME_EXTEND_TIME + 1;
+    const maxTimer = timer + 1 + constants.GAME_EXTEND_TIME + 1;
 
     for (let i = timer + 2; i < maxTimer; i++) {
       await this.delayedUpdateTimer(i);
@@ -370,9 +331,12 @@ class App extends Component {
   handleBroadcastClick() {
     const broadcastId = prompt('make broadcast id');
 
-    if (broadcastId.replace(/^\s+|\s+$/g, '').length <= 0) {
-      alert('Please enter broadcast id');
+    if (!broadcastId) {
       return;
+    }
+
+    if (broadcastId.trim().length <= 0) {
+      return alert('Please enter broadcast id');
     }
 
     this.socket.emit('create', {
@@ -392,6 +356,13 @@ class App extends Component {
         timer: timer - 1
       });
     }
+  }
+
+  handleHomeClick() {
+    this.resetGame();
+    this.setState({
+      currentPage: 'intro'
+    });
   }
 
   handlePlayClick() {
@@ -418,21 +389,17 @@ class App extends Component {
   handleWatchClick() {
     const broadcastId = prompt('input broadcast id');
 
-    if (broadcastId.replace(/^\s+|\s+$/g, '').length <= 0) {
-      alert('Please enter broadcast id');
+    if (!broadcastId) {
       return;
+    }
+
+    if (broadcastId.trim().length <= 0) {
+      return alert('Please enter broadcast id');
     }
 
     this.socket.emit('join', {
       broadcastId,
       userId: this.userId
-    });
-  }
-
-  moveToIntro() {
-    this.resetGame();
-    this.setState({
-      currentPage: 'intro'
     });
   }
 
@@ -442,14 +409,14 @@ class App extends Component {
     }
 
     const curLvl = this.gameDifficulty[this.currentLvlIndex];
-    let lvlArray = this.emojiLvlLookup[curLvl];
-    let nextEmoji = lvlArray.shift();
+    // let lvlArray = game.emojiLvlLookup[curLvl];
     // for demo
-    // let nextEmoji = this.emojiDemo.shift();
+    let lvlArray = game.emojiLvlLookup['#'];
+    let nextEmoji = lvlArray.shift();
 
     if (nextEmoji === undefined) {
-      this.reShuffleLevelEmojis(curLvl);
-      lvlArray = this.emojiLvlLookup[curLvl];
+      game.reShuffleLevelEmojis(curLvl);
+      lvlArray = game.emojiLvlLookup[curLvl];
       nextEmoji = lvlArray.shift();
     }
 
@@ -488,17 +455,17 @@ class App extends Component {
       this.pauseCamera();
     }
 
+    this.isRunning = false;
+
     this.setState({
       isGamePaused: true
     });
-
-    this.isRunning = false;
 
     window.clearInterval(this.timerInterval);
     window.clearInterval(this.speakInterval);
   }
 
-  playGameAgain() {
+  handleTryAgainClick() {
     this.resetGame();
     this.setState({
       currentPage: 'game'
@@ -512,12 +479,12 @@ class App extends Component {
       const result = tfc.tidy(() => {
         const pixels = tfc.fromPixels(videoRef.current);
         const centerHeight = pixels.shape[0] / 2;
-        const beginHeight = centerHeight - VIDEO_PIXELS / 2;
+        const beginHeight = centerHeight - constants.VIDEO_PIXELS / 2;
         const centerWidth = pixels.shape[1] / 2;
-        const beginWidth = centerWidth - VIDEO_PIXELS / 2;
+        const beginWidth = centerWidth - constants.VIDEO_PIXELS / 2;
         const pixelsCropped = pixels.slice(
           [beginHeight, beginWidth, 0],
-          [VIDEO_PIXELS, VIDEO_PIXELS, 3]
+          [constants.VIDEO_PIXELS, constants.VIDEO_PIXELS, 3]
         );
 
         return emojiMobileNet.predict(pixelsCropped);
@@ -543,47 +510,18 @@ class App extends Component {
 
   resetGame() {
     this.nextEmoji();
-    this.updateTimer(GAME_START_TIME);
+    this.updateTimer(constants.GAME_START_TIME);
 
     this.setState({
       score: 0,
-      timer: GAME_START_TIME,
+      timer: constants.GAME_START_TIME,
       emojisFound: [],
       endGamePhotos: []
     });
 
     this.currentLvlIndex = 0;
-    this.timerAtStartOfRound = GAME_START_TIME;
+    this.timerAtStartOfRound = constants.GAME_START_TIME;
     this.topKemojiName = '';
-  }
-
-  reShuffleLevelEmojis(level) {
-    switch (level) {
-      case '1':
-        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_1);
-        break;
-      case '2':
-        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_2);
-        break;
-      case '3':
-        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_3);
-        break;
-      case '4':
-        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_4);
-        break;
-      case '5':
-        this.emojiLvlLookup[level] = shuffle(EMOJIS_LVL_5);
-        break;
-      case '#':
-        // NOTE: the Demo list is not shuffled since we always request them in
-        // same order for demo purposes.
-        this.emojiLvlLookup[level] = Array.from(EMOJIS_LVL_DEMO);
-        break;
-      default:
-        throw new Error(
-          `Error: expected ${level} level string in the level EmojiLevelsLookup`
-        );
-    }
   }
 
   async showCountdown() {
@@ -598,6 +536,7 @@ class App extends Component {
     await this.countdown(3);
     await this.countdown(2);
     await this.countdown(1);
+    await this.countdown(-1); // for show emoji
     await this.countdown(0);
   }
 
@@ -618,35 +557,17 @@ class App extends Component {
     this.timerAtStartOfRound = timer;
     this.timerInterval = window.setInterval(() => {
       this.handleGameTimerCountdown();
-    }, GAME_TIMER_DELAY);
-  }
-
-  sendMessage(message) {
-    console.log('Sending message: ', message);
-    this.socket.emit('message', message);
+    }, constants.GAME_TIMER_DELAY);
   }
 
   showFoundView() {
     this.pauseGame();
-
     this.setState(
       {
         currentPage: 'finish'
       },
-      this.updateTimer.bind(this, GAME_START_TIME)
+      this.updateTimer.bind(this, constants.GAME_START_TIME)
     );
-  }
-
-  startLoading() {
-    this.setState({
-      isLoading: true
-    });
-  }
-
-  termintateLoading() {
-    this.setState({
-      isLoading: false
-    });
   }
 
   unPauseCamera() {
@@ -658,22 +579,24 @@ class App extends Component {
   warmUpModel() {
     const { emojiMobileNet } = this.props;
 
-    emojiMobileNet.predict(tfc.zeros([VIDEO_PIXELS, VIDEO_PIXELS, 3]));
+    emojiMobileNet.predict(
+      tfc.zeros([constants.VIDEO_PIXELS, constants.VIDEO_PIXELS, 3])
+    );
   }
 
   render() {
     const {
-      currentEmoji,
-      score,
-      timer,
-      isLoading,
       countdown,
-      isCountdown,
+      currentEmoji,
       currentPage,
       didUserFound,
+      doSnapShotNow,
       endGamePhotos,
+      isCountdown,
       isGamePaused,
-      doSnapShotNow
+      isLoading,
+      score,
+      timer
     } = this.state;
 
     return (
@@ -701,7 +624,9 @@ class App extends Component {
               onLoadedMetadata={this.onInitGame}
               onSnapShot={this.handleSnapShot}
             />
-            {isCountdown && <Countdown countdown={countdown} />}
+            {isCountdown && (
+              <Countdown countdown={countdown} currentEmoji={currentEmoji} />
+            )}
             {didUserFound && (
               <PopUpMenu
                 emoji="👍"
@@ -715,8 +640,8 @@ class App extends Component {
         {currentPage === 'finish' && (
           <Finish
             endGamePhotos={endGamePhotos}
-            onHomeClick={this.moveToIntro}
-            onTryAgainClick={this.playGameAgain}
+            onHomeClick={this.handleHomeClick}
+            onTryAgainClick={this.handleTryAgainClick}
           />
         )}
         {currentPage === 'watch' && <Watch />}
@@ -724,5 +649,9 @@ class App extends Component {
     );
   }
 }
+
+App.propTypes = {
+  emojiMobileNet: PropTypes.instanceOf(Object).isRequired
+};
 
 export default App;

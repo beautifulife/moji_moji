@@ -39,14 +39,6 @@ export default class MobileNet {
       this.model.dispose();
     }
   }
-  /**
-   * Infer through MobileNet, assumes variables have been loaded. This does
-   * standard ImageNet pre-processing before inferring through the model. This
-   * method returns named activations as well as softmax logits.
-   *
-   * @param input un-preprocessed input Array.
-   * @return The softmax logits.
-   */
 
   predict(input) {
     const preprocessedInput = tfc.div(
