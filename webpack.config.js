@@ -11,7 +11,7 @@ const dirSrc = path.join(__dirname, 'src');
 const outputDirectory = 'dist';
 
 module.exports = {
-  entry: ['@babel/polyfill', './src/index.js'],
+  entry: ['@babel/polyfill', './src/client/index.js'],
   output: {
     path: path.join(__dirname, outputDirectory),
     filename: 'bundle.js',
@@ -79,7 +79,7 @@ module.exports = {
     public: 'https://localhost:8080',
     open: true,
     proxy: {
-      '/api': 'http://localhost:3000'
+      '/': 'https://192.168.0.39:80'
     },
     host: '0.0.0.0',
     https: true,
@@ -94,8 +94,9 @@ module.exports = {
       favicon: './public/favicon.png'
     }),
     new CopyWebpackPlugin([
-      { from: 'src/assets/img', to: 'img' },
-      { from: 'src/assets/model', to: 'model' }
+      { from: 'img', to: 'img' },
+      { from: 'model', to: 'model' },
+      { from: 'audio', to: 'audio' }
     ])
   ]
 };

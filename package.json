@@ -1,14 +1,17 @@
 {
-  "name": "moji-moji-client",
+  "name": "moji-moji",
   "version": "0.0.1",
   "author": "seunguk kim",
   "email": "davidkim1018@gmail.com",
   "github": "@beautifulife",
-  "description": "A game using machine learning (imoji_sacvenger_hunt)",
+  "description": "A game using machine learning (imoji_sacvenger_hunt) with broadcasting",
   "scripts": {
     "test": "jest",
+    "start": "node ./src/server/app.js",
     "build": "webpack --mode production",
-    "dev": "webpack-dev-server --mode development --devtool inline-source-map --hot"
+    "client": "webpack-dev-server --mode development --devtool inline-source-map --hot",
+    "server": "nodemon ./src/server/app.js",
+    "dev": "concurrently 'npm run server' 'npm run client'"
   },
   "jest": {
     "moduleNameMapper": {
@@ -18,14 +21,19 @@
   "dependencies": {
     "@babel/polyfill": "^7.2.5",
     "@tensorflow/tfjs-converter": "^0.2.1",
-    "@tensorflow/tfjs-core": "^0.9.0",
+    "@tensorflow/tfjs-core": "^1.0.3",
     "acorn": "^6.1.1",
+    "cors": "^2.8.5",
+    "express": "^4.16.4",
+    "http-errors": "^1.7.2",
     "lodash": "^4.17.11",
+    "morgan": "^1.9.1",
     "prop-types": "^15.7.2",
     "react": "^16.8.3",
     "react-dom": "^16.8.3",
     "react-router-dom": "^4.3.1",
     "react-spinners": "^0.5.3",
+    "socket.io": "^2.2.0",
     "socket.io-client": "^2.2.0"
   },
   "devDependencies": {
