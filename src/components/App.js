@@ -35,7 +35,7 @@ class App extends Component {
     };
 
     this.currentLvlIndex = 0;
-    this.endpoint = '192.168.0.39:3000';
+    this.endpoint = 'https://www.beautifulife.dev:443';
     this.gameDifficulty = '1121222345';
     this.isFirstRun = true;
     this.isRunning = false;

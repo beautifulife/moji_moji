@@ -2,6 +2,7 @@ require('@babel/polyfill');
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 const IS_DEV = (process.env.NODE_ENV === 'dev');
 
@@ -91,6 +92,10 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: './public/index.html',
       favicon: './public/favicon.png'
-    })
+    }),
+    new CopyWebpackPlugin([
+      { from: 'src/assets/img', to: 'img' },
+      { from: 'src/assets/model', to: 'model' }
+    ])
   ]
 };
