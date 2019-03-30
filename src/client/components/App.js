@@ -52,8 +52,9 @@ class App extends Component {
     this.startGame = this.startGame.bind(this);
   }
 
-  componentDidMount() {
+  async componentDidMount() {
     this.createSignalingChannel();
+    this.setupAudioSources();
   }
 
   checkEmojiMatch(emojiNameTop1, emojiNameTop2) {
@@ -85,6 +86,7 @@ class App extends Component {
         }, 2000);
       } else {
         setTimeout(() => {
+          this.pauseAudio(game.AUDIO.LOADING);
           this.setState({
             isLoading: false,
             isCountdown: true,
@@ -268,6 +270,7 @@ class App extends Component {
     const { currentEmoji, emojisFound, score } = this.state;
 
     this.pauseGame();
+    this.playAudio(game.AUDIO.FOUND_IT);
     this.setState({
       score: score + 1,
       emojisFound: [...emojisFound, currentEmoji],
@@ -322,9 +325,13 @@ class App extends Component {
     const { timer } = this.state;
     const maxTimer = timer + 1 + constants.GAME_EXTEND_TIME + 1;
 
+    this.playAudio(game.AUDIO.TIMER_INCREASE, true);
+
     for (let i = timer + 2; i < maxTimer; i++) {
       await this.delayedUpdateTimer(i);
     }
+
+    this.pauseAudio(game.AUDIO.TIMER_INCREASE);
   }
 
   handleBroadcastClick() {
@@ -349,12 +356,18 @@ class App extends Component {
     const { timer } = this.state;
 
     if (timer === 0) {
+      this.pauseAudio(game.AUDIO.GAME_LOOP);
+      this.pauseAudio(game.AUDIO.TIME_RUNNING_LOW);
       window.clearInterval(this.timerInterval);
       this.showFoundView();
     } else {
       this.setState({
         timer: timer - 1
       });
+
+      if (timer <= 6) {
+        this.playAudio(game.AUDIO.TIME_RUNNING_LOW);
+      }
     }
   }
 
@@ -366,6 +379,8 @@ class App extends Component {
   }
 
   handlePlayClick() {
+    this.pauseAudio(game.AUDIO.INTRO);
+    this.playAudio(game.AUDIO.LOADING, true, 0, 3);
     this.setState({
       isLoading: true,
       currentPage: 'game'
@@ -455,6 +470,9 @@ class App extends Component {
 
     this.isRunning = false;
 
+    this.pauseAudio(game.AUDIO.GAME_LOOP);
+    this.pauseAudio(game.AUDIO.TIME_RUNNING_LOW);
+
     this.setState({
       isGamePaused: true
     });
@@ -465,9 +483,46 @@ class App extends Component {
 
   handleTryAgainClick() {
     this.resetGame();
+    this.playAudio(game.AUDIO.LOADING, true, 0, 3);
     this.setState({
-      currentPage: 'game'
+      currentPage: 'game',
+      isLoading: true
     });
+  }
+
+  pauseAudio(audio) {
+    game.audioSources[audio].pause();
+    game.audioSources[audio].currentTime = 0;
+  }
+
+  playAudio(audio, loop = false, startTime = 0, endTime = undefined) {
+    const audioElement = game.audioSources[audio];
+
+    if (loop) {
+      audioElement.loop = true;
+    }
+
+    if (game.audioSources[audio].paused) {
+      audioElement.currentTime = startTime;
+      const playPromise = audioElement.play();
+
+      if (endTime !== undefined) {
+        const timeUpdate = ev => {
+          if (audioElement.currentTime >= endTime) {
+            audioElement.pause();
+            audioElement.removeEventListener('timeupdate', timeUpdate);
+          }
+        };
+
+        audioElement.addEventListener('timeupdate', timeUpdate);
+      }
+
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Error in playAudio: ' + error);
+        });
+      }
+    }
   }
 
   async predict(videoRef) {
@@ -498,15 +553,14 @@ class App extends Component {
     window.requestAnimationFrame(() => this.predict(videoRef));
   }
 
-  resumeGame() {
-    const { isGamePaused } = this.state;
-
-    if (isGamePaused) {
-      this.startGame();
-    }
+  resetAudioSources() {
+    Object.keys(game.audioSources).forEach(audio => {
+      this.pauseAudio(audio);
+    });
   }
 
   resetGame() {
+    this.resetAudioSources();
     this.nextEmoji();
     this.updateTimer(constants.GAME_START_TIME);
 
@@ -522,6 +576,33 @@ class App extends Component {
     this.topKemojiName = '';
   }
 
+  resumeGame() {
+    const { isGamePaused } = this.state;
+
+    if (isGamePaused) {
+      this.startGame();
+    }
+  }
+
+  setupAudioSources() {
+    Object.keys(game.audioSources).forEach(audio => {
+      game.audioSources[audio].muted = true;
+      let playPromise = game.audioSources[audio].play();
+
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            game.audioSources[audio].pause();
+            game.audioSources[audio].muted = false;
+            this.playAudio(game.AUDIO.INTRO, true);
+          })
+          .catch(error => {
+            console.log('Error with play promise');
+          });
+      }
+    });
+  }
+
   async showCountdown() {
     const { timer } = this.state;
 
@@ -529,8 +610,11 @@ class App extends Component {
       this.isRunning = false;
     }
 
-    this.updateTimer(timer, true);
+    setTimeout(() => {
+      this.playAudio(game.AUDIO.COUNTDOWN);
+    }, 1000);
 
+    this.updateTimer(timer, true);
     await this.countdown(3);
     await this.countdown(2);
     await this.countdown(1);
@@ -552,6 +636,10 @@ class App extends Component {
     }
 
     this.isRunning = true;
+
+    this.pauseAudio(game.AUDIO.COUNTDOWN);
+    this.playAudio(game.AUDIO.GAME_LOOP, true);
+
     this.timerAtStartOfRound = timer;
     this.timerInterval = window.setInterval(() => {
       this.handleGameTimerCountdown();
@@ -559,6 +647,16 @@ class App extends Component {
   }
 
   showFoundView() {
+    const { emojisFound } = this.state;
+
+    if (!emojisFound.length) {
+      this.playAudio(game.AUDIO.FAIL);
+    } else if (emojisFound.length <= 5) {
+      this.playAudio(game.AUDIO.END);
+    } else {
+      this.playAudio(game.AUDIO.WIN);
+    }
+
     this.pauseGame();
     this.setState(
       {
@@ -612,6 +710,7 @@ class App extends Component {
             {Object.keys(currentEmoji).length ? (
               <StatusBar
                 currentEmoji={currentEmoji}
+                onHomeClick={this.handleHomeClick}
                 score={score}
                 timer={timer}
               />
