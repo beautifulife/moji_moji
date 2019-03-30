@@ -1,22 +1,22 @@
-// const http = require('http');
-const https = require('https');
-const fs = require('fs');
+const http = require('http');
+// const https = require('https');
+// const fs = require('fs');
 const createError = require('http-errors');
 const express = require('express');
 const logger = require('morgan');
 const cors = require('cors');
 
 const app = express();
-// const server = http.createServer(app);
-const server = https.createServer(
-  {
-    key: fs.readFileSync('key.pem'),
-    cert: fs.readFileSync('certificate.pem'),
-    requestCert: true,
-    rejectUnauthorized: false,
-  },
-  app
-);
+const server = http.createServer(app);
+// const server = https.createServer(
+//   {
+//     key: fs.readFileSync('key.pem'),
+//     cert: fs.readFileSync('certificate.pem'),
+//     requestCert: true,
+//     rejectUnauthorized: false,
+//   },
+//   app
+// );
 const io = require('socket.io')(server);
 require('./sockets')(io);
 

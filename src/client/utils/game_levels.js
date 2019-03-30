@@ -547,28 +547,58 @@ export const EMOJIS_LVL_5 = [
 // here.
 export const EMOJIS_LVL_DEMO = [
   {
-    name: 'watch',
-    emoji: '⌚',
-    path: '/img/emojis/game/watch.svg'
+    name: 'hand',
+    emoji: '✋',
+    path: '/img/emojis/game/hand.svg'
   },
   {
-    name: 'shoe',
-    emoji: '👞',
-    path: '/img/emojis/game/shoe.svg'
+    name: 'light bulb',
+    emoji: '💡',
+    path: '/img/emojis/game/light bulb.svg'
   },
   {
-    name: 'banana',
-    emoji: '🍌',
-    path: '/img/emojis/game/banana.svg'
+    name: 'keyboard',
+    emoji: '⌨️',
+    path: '/img/emojis/game/keyboard.svg'
   },
   {
-    name: 'beer',
-    emoji: '🍺',
-    path: '/img/emojis/game/beer.svg'
+    name: 'laptop',
+    emoji: '💻',
+    path: '/img/emojis/game/laptop.svg'
   },
   {
-    name: 'jack o lantern',
-    emoji: '🎃',
-    path: '/img/emojis/game/jack o lantern.svg'
+    name: 'backpack',
+    emoji: '🎒',
+    path: '/img/emojis/game/backpack.svg'
+  },
+  {
+    name: 'headphones',
+    emoji: '🎧',
+    path: '/img/emojis/game/headphones.svg'
+  },
+  {
+    name: 'mouse',
+    emoji: '🖱',
+    path: '/img/emojis/game/mouse.svg'
+  },
+  {
+    name: 'clock',
+    emoji: '🕑',
+    path: '/img/emojis/game/clock.svg'
+  },
+  {
+    name: 'bus',
+    emoji: '🚎',
+    path: '/img/emojis/game/bus.svg'
+  },
+  {
+    name: 'cabinet',
+    emoji: '🗄',
+    path: '/img/emojis/game/cabinet.svg'
+  },
+  {
+    name: 'piano',
+    emoji: '🎹',
+    path: '/img/emojis/game/piano.svg'
   }
 ];

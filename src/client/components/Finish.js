@@ -4,7 +4,7 @@ import './Finish.scss';
 import PhotoAlbum from './PhotoAlbum';
 import PopUpMenu from './PopUpMenu';
 
-const Finish = ({ endGamePhotos, onHomeClick, onTryAgainClick }) => {
+const Finish = ({ endGamePhotos, onHomeClick, onPhotoClick, onTryAgainClick }) => {
   return (
     <div className="Finish">
       <div className="Finish__header">
@@ -14,7 +14,7 @@ const Finish = ({ endGamePhotos, onHomeClick, onTryAgainClick }) => {
       </div>
       <div className="Finish__body">
         {endGamePhotos.length ? (
-          <PhotoAlbum endGamePhotos={endGamePhotos} />
+          <PhotoAlbum endGamePhotos={endGamePhotos} onPhotoClick={onPhotoClick} />
         ) : (
           <PopUpMenu emoji="😭" text="You can do better!" buttonText="TRY AGAIN" onButtonClick={onTryAgainClick} />
         )}
@@ -26,12 +26,14 @@ const Finish = ({ endGamePhotos, onHomeClick, onTryAgainClick }) => {
 Finish.propTypes = {
   endGamePhotos: PropTypes.instanceOf(Array),
   onHomeClick: PropTypes.func,
+  onPhotoClick: PropTypes.func,
   onTryAgainClick: PropTypes.func
 };
 
 Finish.defaultProps = {
   endGamePhotos: [],
   onHomeClick: () => {},
+  onPhotoClick: () => {},
   onTryAgainClick: () => {}
 };
 

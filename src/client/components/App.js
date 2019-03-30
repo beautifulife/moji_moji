@@ -54,7 +54,9 @@ class App extends Component {
 
   async componentDidMount() {
     this.createSignalingChannel();
-    this.setupAudioSources();
+    game.audioSources[game.AUDIO.INTRO].onloadeddata = () => {
+      setTimeout(() => this.setupAudioSources(), 2000);
+    };
   }
 
   checkEmojiMatch(emojiNameTop1, emojiNameTop2) {
@@ -346,6 +348,8 @@ class App extends Component {
       return alert('Please enter broadcast ID');
     }
 
+    this.pauseAudio(game.AUDIO.INTRO);
+
     this.socket.emit('create', {
       userId: this.userId,
       broadcastId
@@ -412,6 +416,8 @@ class App extends Component {
       return alert('Please enter broadcast ID');
     }
 
+    this.pauseAudio(game.AUDIO.INTRO);
+
     this.socket.emit('join', {
       broadcastId,
       userId: this.userId
@@ -424,9 +430,9 @@ class App extends Component {
     }
 
     const curLvl = this.gameDifficulty[this.currentLvlIndex];
-    let lvlArray = game.emojiLvlLookup[curLvl];
+    // let lvlArray = game.emojiLvlLookup[curLvl];
     // for demo
-    // let lvlArray = game.emojiLvlLookup['#'];
+    let lvlArray = game.emojiLvlLookup['#'];
     let nextEmoji = lvlArray.shift();
 
     if (nextEmoji === undefined) {
@@ -438,7 +444,8 @@ class App extends Component {
     this.currentLvlIndex++;
 
     this.setState({
-      currentEmoji: nextEmoji
+      currentEmoji: nextEmoji,
+      isLoading: true,
     });
   }
 
