@@ -2,7 +2,8 @@
 
 ## Introduction
 
-![moji_moji](https://user-images.githubusercontent.com/41249563/55346920-8dd4e480-54ee-11e9-811b-d69e5a373fd6.gif)
+![moji_moji-demo](./moji_moji.gif)
+[YouTube Demo](https://youtu.be/mf2h2QoYAjU)
 
 **moji_moji** is a game that finds emoji in real life. To do this, analyze the video stream using **tensorflow.js**. It also allows you to broadcast gameplay in real time. It utilizes the **WebRTC** technology which enables to broadcast to more than 10 users and enables stream connection between peer to peer.
 
