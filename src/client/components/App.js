@@ -15,6 +15,7 @@ import Watch from './Watch';
 
 import * as constants from '../utils/constants';
 import * as game from '../utils/game';
+import { isIOS, isMobile } from '../utils/device';
 
 class App extends Component {
   constructor(props) {
@@ -346,6 +347,10 @@ class App extends Component {
   }
 
   handleBroadcastClick() {
+    if (isMobile()) {
+      return alert('Mobile device is not currently supported');
+    }
+
     const broadcastId = prompt('Make broadcast ID');
 
     if (!broadcastId) {
@@ -392,6 +397,10 @@ class App extends Component {
   }
 
   handlePlayClick() {
+    if (isIOS()) {
+      return alert('IOS is not currently supported');
+    }
+
     this.pauseAudio(game.AUDIO.INTRO);
     this.playAudio(game.AUDIO.LOADING, true, 0, 3);
     this.setState({
@@ -415,6 +424,10 @@ class App extends Component {
   }
 
   handleWatchClick() {
+    if (isIOS()) {
+      return alert('IOS is not currently supported');
+    }
+
     const broadcastId = prompt('Input broadcast ID');
 
     if (!broadcastId) {
@@ -439,9 +452,9 @@ class App extends Component {
     }
 
     const curLvl = this.gameDifficulty[this.currentLvlIndex];
-    // let lvlArray = game.emojiLvlLookup[curLvl];
+    let lvlArray = game.emojiLvlLookup[curLvl];
     // for demo
-    let lvlArray = game.emojiLvlLookup['#'];
+    // let lvlArray = game.emojiLvlLookup['#'];
     let nextEmoji = lvlArray.shift();
 
     if (nextEmoji === undefined) {

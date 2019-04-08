@@ -104,6 +104,7 @@ For local environment, you have to make 'openssl' (visit here 'https://www.ibm.c
 * Code refactoring(Improving state management and code reusability)
 * BugFix
 * Improving mobile support(Improving recognition rate and Adding mobile broadcasting)
+* IOS support.
 * Improving Reactive design
 
 ## Sincere Thanks
