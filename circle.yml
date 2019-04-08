@@ -16,10 +16,10 @@ jobs:
           name: Install yarn Dependencies
           command: |
             sudo npm install
-      # - run:
-      #     # Test codes
-      #     name: Test code using jest
-      #     command: npm run test
+      - run:
+          # Test codes
+          name: Test code using jest
+          command: npm run test
       - run:
           # Test codes
           name: Build app
