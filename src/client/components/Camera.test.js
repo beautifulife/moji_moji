@@ -17,6 +17,7 @@ describe('<Camera />', () => {
 
     beforeEach(() => {
       wrapper = shallow(<Camera {...props} />);
+      wrapper.setCameraFacing = jest.fn();
     });
 
     it('component rendered', () => {
@@ -37,6 +38,7 @@ describe('<Camera />', () => {
   });
 
   describe('about state', () => {
+    Camera.prototype.setCameraFacing = jest.fn();
     const wrapper = shallow(<Camera />);
 
     it('initial state set', () => {

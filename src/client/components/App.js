@@ -55,7 +55,7 @@ class App extends Component {
   async componentDidMount() {
     this.createSignalingChannel();
     game.audioSources[game.AUDIO.INTRO].onloadeddata = () => {
-      setTimeout(() => this.setupAudioSources(), 2000);
+      setTimeout(() => this.setupAudioSources(), 3000);
     };
   }
 
@@ -143,24 +143,29 @@ class App extends Component {
     });
 
     this.socket.on('create', async message => {
-      if (message.result === 'exist') {
-        return alert('already exist');
+      try {
+        if (message.result === 'exist') {
+          return alert('already exist');
+        }
+
+        await this.setupBroadcastCamera();
+        alert(`broadcast '${message.broadcastId}' ready!`);
+      } catch (err) {
+        console.log('error occured in broadcast setup', err);
       }
-
-      await this.setupBroadcastCamera();
-
-      alert(`broadcast '${message.broadcastId}' ready!`);
     });
 
     this.socket.on('join', async message => {
-      if (message.result === 'non exist') {
-        return alert('non exist broadcast ID');
-      }
-
-      const watcherPeerConnection = await this.createPeerConnection('watcher');
-      this.watcherPeerConnection = watcherPeerConnection;
-
       try {
+        if (message.result === 'non exist') {
+          return alert('non exist broadcast ID');
+        }
+
+        const watcherPeerConnection = await this.createPeerConnection(
+          'watcher'
+        );
+        this.watcherPeerConnection = watcherPeerConnection;
+
         const offer = await watcherPeerConnection.createOffer({
           offerToReceiveVideo: true
         });
@@ -176,7 +181,7 @@ class App extends Component {
 
         alert('ready to watch!');
       } catch (err) {
-        console.error(err);
+        console.log('error occured in peer connection', err);
       }
     });
 
@@ -195,18 +200,18 @@ class App extends Component {
           desc: this.watcherPeerConnection.localDescription
         });
       } catch (err) {
-        console.error(err);
+        console.log('error occured in re-join process', err);
       }
     });
 
     this.socket.on('offer', async message => {
-      const playerStream = window.playerStream;
-      const watcherStream = window.watcherStream;
-      const playerPeerConnection = this.createPeerConnection('player');
-      this.playerPeerConnection = playerPeerConnection;
-      const desc = new RTCSessionDescription(message.desc);
-
       try {
+        const playerStream = window.playerStream;
+        const watcherStream = window.watcherStream;
+        const playerPeerConnection = this.createPeerConnection('player');
+        this.playerPeerConnection = playerPeerConnection;
+        const desc = new RTCSessionDescription(message.desc);
+
         await playerPeerConnection.setRemoteDescription(desc);
         if (message.isBroadcastOrigin) {
           await playerStream.getTracks().forEach(track => {
@@ -228,14 +233,14 @@ class App extends Component {
           desc: playerPeerConnection.localDescription
         });
       } catch (err) {
-        console.error(err);
+        console.log('error occured in offer process', err);
       }
     });
 
     this.socket.on('re-offer', async message => {
-      const desc = new RTCSessionDescription(message.desc);
-
       try {
+        const desc = new RTCSessionDescription(message.desc);
+
         await this.playerPeerConnection.setRemoteDescription(desc);
         const answer = await this.playerPeerConnection.createAnswer();
         await this.playerPeerConnection.setLocalDescription(answer);
@@ -247,7 +252,7 @@ class App extends Component {
           desc: this.playerPeerConnection.localDescription
         });
       } catch (err) {
-        console.error(err);
+        console.log('error occured in re-offer process', err);
       }
     });
 
@@ -306,7 +311,7 @@ class App extends Component {
         window.playerStream = stream;
       }
     } catch (err) {
-      console.error(err);
+      console.log('error occured in getting media process', err);
     }
   }
 
@@ -330,7 +335,11 @@ class App extends Component {
     this.playAudio(game.AUDIO.TIMER_INCREASE, true);
 
     for (let i = timer + 2; i < maxTimer; i++) {
-      await this.delayedUpdateTimer(i);
+      try {
+        await this.delayedUpdateTimer(i);
+      } catch (err) {
+        console.log('error occured in delayed update timer process', err);
+      }
     }
 
     this.pauseAudio(game.AUDIO.TIMER_INCREASE);
@@ -339,7 +348,6 @@ class App extends Component {
   handleBroadcastClick() {
     const broadcastId = prompt('Make broadcast ID');
 
-    console.log(broadcastId);
     if (!broadcastId) {
       return;
     }
@@ -378,7 +386,8 @@ class App extends Component {
   handleHomeClick() {
     this.resetGame();
     this.setState({
-      currentPage: 'intro'
+      currentPage: 'intro',
+      isLoading: false
     });
   }
 
@@ -445,7 +454,7 @@ class App extends Component {
 
     this.setState({
       currentEmoji: nextEmoji,
-      isLoading: true,
+      isLoading: true
     });
   }
 
@@ -459,8 +468,8 @@ class App extends Component {
       this.nextEmoji();
       this.predict(videoRef);
       this.showCountdown();
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      console.log('error occured in init game process', err);
     }
   }
 
@@ -514,7 +523,7 @@ class App extends Component {
       const playPromise = audioElement.play();
 
       if (endTime !== undefined) {
-        const timeUpdate = ev => {
+        const timeUpdate = () => {
           if (audioElement.currentTime >= endTime) {
             audioElement.pause();
             audioElement.removeEventListener('timeupdate', timeUpdate);
@@ -525,8 +534,8 @@ class App extends Component {
       }
 
       if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log('Error in playAudio: ' + error);
+        playPromise.catch(err => {
+          console.log('error occured in playAudio', err);
         });
       }
     }
@@ -535,26 +544,32 @@ class App extends Component {
   async predict(videoRef) {
     const { emojiMobileNet } = this.props;
 
+    if (!videoRef.current) {
+      return;
+    }
+
     if (this.isRunning) {
-      const result = tfc.tidy(() => {
-        const pixels = tfc.browser.fromPixels(videoRef.current);
-        const centerHeight = pixels.shape[0] / 2;
-        const beginHeight = centerHeight - constants.VIDEO_PIXELS / 2;
-        const centerWidth = pixels.shape[1] / 2;
-        const beginWidth = centerWidth - constants.VIDEO_PIXELS / 2;
-        const pixelsCropped = pixels.slice(
-          [beginHeight, beginWidth, 0],
-          [constants.VIDEO_PIXELS, constants.VIDEO_PIXELS, 3]
-        );
+      try {
+        const result = tfc.tidy(() => {
+          const pixels = tfc.browser.fromPixels(videoRef.current);
+          const centerHeight = pixels.shape[0] / 2;
+          const beginHeight = centerHeight - constants.VIDEO_PIXELS / 2;
+          const centerWidth = pixels.shape[1] / 2;
+          const beginWidth = centerWidth - constants.VIDEO_PIXELS / 2;
+          const pixelsCropped = pixels.slice(
+            [beginHeight, beginWidth, 0],
+            [constants.VIDEO_PIXELS, constants.VIDEO_PIXELS, 3]
+          );
 
-        return emojiMobileNet.predict(pixelsCropped);
-      });
+          return emojiMobileNet.predict(pixelsCropped);
+        });
 
-      const topK = await emojiMobileNet.getTopKClasses(result, 10);
+        const topK = await emojiMobileNet.getTopKClasses(result, 10);
 
-      // Match the top 2 matches against our current active emoji.
-      console.log(...topK);
-      this.checkEmojiMatch(topK[0].label, topK[1].label);
+        this.checkEmojiMatch(topK[0].label, topK[1].label);
+      } catch (err) {
+        console.log('error occured in predict process', err);
+      }
     }
 
     window.requestAnimationFrame(() => this.predict(videoRef));
@@ -594,7 +609,7 @@ class App extends Component {
   setupAudioSources() {
     Object.keys(game.audioSources).forEach(audio => {
       game.audioSources[audio].muted = true;
-      let playPromise = game.audioSources[audio].play();
+      const playPromise = game.audioSources[audio].play();
 
       if (playPromise !== undefined) {
         playPromise
@@ -603,8 +618,8 @@ class App extends Component {
             game.audioSources[audio].muted = false;
             this.playAudio(game.AUDIO.INTRO, true);
           })
-          .catch(error => {
-            console.log('Error with play promise');
+          .catch(err => {
+            console.log('error occured with play promise', err);
           });
       }
     });
@@ -622,11 +637,15 @@ class App extends Component {
     }, 1000);
 
     this.updateTimer(timer, true);
-    await this.countdown(3);
-    await this.countdown(2);
-    await this.countdown(1);
-    await this.countdown(-1); // for show emoji
-    await this.countdown(0);
+    try {
+      await this.countdown(3);
+      await this.countdown(2);
+      await this.countdown(1);
+      await this.countdown(-1); // for show emoji
+      await this.countdown(0);
+    } catch (err) {
+      console.log('error occured in countdown process', err);
+    }
   }
 
   startGame() {

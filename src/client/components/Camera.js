@@ -22,7 +22,7 @@ export default class Camera extends Component {
 
   componentDidMount() {
     this.setupCamera();
-    // this.setCameraFacing();
+    this.setCameraFacing(); // for desktop device
   }
 
   componentDidUpdate() {
@@ -61,14 +61,18 @@ export default class Camera extends Component {
   }
 
   async setupCamera() {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: 'environment' }
-      });
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: 'environment' }
+        });
 
-      window.stream = stream;
-      this.videoRef.current.srcObject = stream;
+        window.stream = stream;
+        this.videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.log('error occured in camera setup process', err);
     }
   }
 
@@ -92,7 +96,7 @@ export default class Camera extends Component {
     }
   }
 
-  snapshot() {
+  async snapshot() {
     const { onSnapShot } = this.props;
 
     this.snapShotCanvas.height = this.videoRef.current.height;
@@ -110,9 +114,12 @@ export default class Camera extends Component {
 
     const img = new Image();
 
-    img.src = this.snapShotCanvas
-      .toDataURL('image/png')
-      .replace('image/png', 'image/octet-stream');
+    try {
+      const imageSrc = await this.snapShotCanvas.toDataURL('image/png');
+      img.src = await imageSrc.replace('image/png', 'image/octet-stream');
+    } catch (err) {
+      console.log('error occured in snapshot save process', err);
+    }
 
     onSnapShot(img);
   }
